@@ -1,6 +1,6 @@
 // Haulist service worker: keeps the app shell cached so it opens instantly / offline.
 // Bump VERSION whenever you upload a new index.html so phones get the update.
-const VERSION = 'haulist-v0.6.5';
+const VERSION = 'haulist-v0.6.6';
 const SHELL = ['./', 'index.html', 'privacy.html', 'config.js', 'manifest.json', 'icon.svg', 'icon-192.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(VERSION).then(c => c.addAll(SHELL))); self.skipWaiting(); });
 self.addEventListener('activate', e => {

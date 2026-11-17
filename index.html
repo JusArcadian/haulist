@@ -431,7 +431,8 @@ function familyView(){
       <div class="sub">${B().url ? '🟢 Connected' : '⚪ Demo mode'}${B().queue.length ? ` · ${B().queue.length} trip(s) waiting to sync` : ''}</div></div>
       <span style="color:var(--muted)">›</span></div>
     <div class="cat">Members${db?'':' · tap to test as them'}</div>
-    ${state.members.map(m => `<div class="item ${db?'':'tap'}" onclick="${db?'':`me='${m.id}';render();toast('Now acting as ${esc(m.name)}')`}">
+    <button class="btn full" style="margin-bottom:10px" onclick="profileSheet()">✏️ Edit my profile</button>
+    ${state.members.map(m => `<div class="item ${db && m.id!==me?'':'tap'}" onclick="${db ? (m.id===me?'profileSheet()':'') : `me='${m.id}';render();toast('Now acting as ${esc(m.name)}')`}">
       ${avatar(m.id,'lg')}<div class="grow"><div class="title">${esc(m.name)} ${m.id===me?'<span class="chip hot">You</span>':''}</div>
       <div class="sub">${m.shopping?'<span style="color:var(--good)">● </span>':''}${esc(m.status)}</div></div>
       <span class="chip">${m.role}</span></div>`).join('')}
@@ -814,7 +815,41 @@ function welcome(){
     <div class="item"><div class="thumb">👨‍👩‍👧</div><div class="grow"><div class="title">Invite family</div><div class="sub">Family tab → Copy invite. Lists update live for everyone.</div></div></div>
     <button class="btn full primary" style="margin-top:10px" onclick="closeSheet()">Got it</button>`);
 }
-let pendingJoin = '', setupName = '';
+let pendingJoin = '', setupName = '', pickColor = '';
+function profileSheet(){
+  const m = who(me); pickColor = m.color || COLORS[0];
+  sheet(`<h2>Your profile</h2>
+    <div style="display:flex;justify-content:center;margin:4px 0 6px" id="pav">${avatar(me,'lg')}</div>
+    <label>Name (what your family sees)</label><input id="pn" value="${esc(m.name||'')}" maxlength="30">
+    <label>Color</label><div class="pick" id="pc">${COLORS.map(c => `<span class="${pickColor===c?'on':''}" style="background:${c}"
+      onclick="pickColor='${c}';document.querySelectorAll('#pc span').forEach(x=>x.classList.remove('on'));this.classList.add('on')"></span>`).join('')}</div>
+    <button class="btn full primary" style="margin-top:16px" onclick="saveProfile()">Save</button>
+    ${db ? `<button class="btn full ghost" style="margin-top:6px" onclick="leaveSheet()">Leave this family</button>` : ''}`);
+}
+async function saveProfile(){
+  const name = $('#pn').value.trim(); if (!name) return toast('Type a name');
+  const m = who(me); m.name = name; m.color = pickColor;
+  if (db) {
+    const r = await sb.from('members').update({name, color:pickColor}).eq('family_id', fam.id).eq('user_id', me);
+    if (r.error) return toast('Sync error: ' + r.error.message);
+    sb.auth.updateUser({data:{name}});                       // new families you join use it too
+    names[me] = name; loadTable('members');
+  }
+  closeSheet(); render(); toast('Profile saved');
+}
+function leaveSheet(){
+  const others = state.members.filter(m => m.id !== me);
+  if (who(me).role === 'Admin' && others.length) return toast("You're the Admin. Others still need you, so you can't leave yet.");
+  sheet(`<h2>Leave ${esc(state.familyName)}?</h2><p class="sub">You'll stop seeing this family's lists. You can rejoin with an invite code.</p>
+    <button class="btn full primary" style="margin-top:14px;background:#FF4D6A" onclick="leaveFamily()">Leave family</button>
+    <button class="btn full ghost" style="margin-top:6px" onclick="closeSheet()">Cancel</button>`);
+}
+async function leaveFamily(){
+  const r = await sb.from('members').delete().eq('family_id', fam.id).eq('user_id', me);
+  if (r.error) return toast('Sync error: ' + r.error.message);
+  try { localStorage.removeItem('haulist_family'); } catch(e) {}
+  location.reload();
+}
 function familySetup(name, step, msg){
   setupName = name ?? setupName;
   const err = msg ? `<div class="hint" style="margin:8px 0">${esc(msg)}</div>` : '';
@@ -827,6 +862,8 @@ function familySetup(name, step, msg){
     <label>List name</label><input id="ff" value="${esc(setupName ? setupName + "'s Family" : '')}">
     <button class="btn full primary" style="margin-top:14px" onclick="doCreate()">Create</button>`);
   lockSheet(`<h2>Hi${setupName ? ' ' + esc(setupName) : ''}! 👋</h2><p class="sub" style="margin-bottom:14px">How do you want to start?</p>${err}
+    <label>Your name (what your family sees)</label><input id="sn" value="${esc(setupName)}" maxlength="30" oninput="setupName=this.value.trim()">
+    <div style="height:12px"></div>
     <div class="card row tap" onclick="familySetup(null,'new')"><div class="thumb">✨</div>
       <div class="grow"><div class="title">Start a new list</div><div class="sub">For you and your family. You'll get an invite code to share.</div></div></div>
     <div class="card row tap" onclick="familySetup(null,'join')"><div class="thumb">🔑</div>
