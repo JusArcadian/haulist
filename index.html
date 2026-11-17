@@ -441,7 +441,7 @@ function familyView(){
     <div class="card row" style="margin-top:16px;justify-content:space-between">
       <div><div class="title">Dark mode</div><div class="sub">Easy on the eyes</div></div>
       <div class="switch ${state.dark?'on':''}" onclick="state.dark=!state.dark;render()"></div></div>
-    ${db ? `<button class="btn full ghost" style="margin-top:8px" onclick="signOut()">Sign out</button>` : `<button class="btn full ghost" style="margin-top:8px" onclick="resetDemo()">Reset to sample data</button>`}`;
+    ${db ? `<button class="btn full ghost" style="margin-top:8px" onclick="signOut()">Sign out</button><p class="sub" style="text-align:center"><a href="privacy.html" style="color:var(--muted)">Privacy Policy</a></p>` : `<button class="btn full ghost" style="margin-top:8px" onclick="resetDemo()">Reset to sample data</button>`}`;
 }
 
 /* ===================== 4. SHEETS ===================== */
@@ -768,7 +768,8 @@ function authScreen(msg){
     <div class="row"><input id="ap" name="password" type="password" autocomplete="${up?'new-password':'current-password'}">
       <button type="button" class="btn" onclick="const p=$('#ap');p.type=p.type==='password'?'text':'password';this.textContent=p.type==='password'?'Show':'Hide'">Show</button></div>
     <button type="submit" class="btn full primary" style="margin-top:16px">${up?'Create account':'Sign in'}</button></form>
-    ${up ? '' : `<button class="btn full ghost" style="margin-top:6px" onclick="forgotPw()">Forgot password?</button>`}`);
+    ${up ? '' : `<button class="btn full ghost" style="margin-top:6px" onclick="forgotPw()">Forgot password?</button>`}
+    <p class="sub" style="text-align:center;margin-top:10px"><a href="privacy.html" style="color:var(--muted)">Privacy Policy</a></p>`);
 }
 let lastEmail = '';
 const remember = () => { lastEmail = ($('#ae')||{}).value || lastEmail; };
