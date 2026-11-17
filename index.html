@@ -414,7 +414,8 @@ function shopView(){
         <div class="row"><button class="btn primary" onclick="finishTrip()">Finish trip</button>
         <button class="btn" onclick="presenceSheet()">${who(me).shopping ? '📍 '+esc(who(me).shopping) : "📍 Check in"}</button></div></div>
     </div>
-    ${who(me).shopping ? `<div class="live">✅ Checked in at <b>${esc(who(me).shopping)}</b> · ${hm(who(me).since)}${order.length ? ' · sorted like your last trip here' : ''}</div>` : ''}
+    ${who(me).shopping ? `<div class="live" style="justify-content:space-between"><span>✅ Checked in at <b>${esc(who(me).shopping)}</b> · ${hm(who(me).since)}${order.length ? ' · sorted like your last trip here' : ''}</span>
+      <button class="btn" style="padding:6px 10px;white-space:nowrap" onclick="setPresence('');toast('Stopped shopping — family can see you left')">⏹ Stop</button></div>` : ''}
     ${(() => {
       const byBud = {};
       items.filter(i=>i.done).forEach(i => { const b = B().map[i.cid]; if (b) byBud[b] = (byBud[b]||0) + cost(i); });
@@ -1186,7 +1187,13 @@ function handleShare(){
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(()=>{});
 
 /* ===================== 6. WIRING ===================== */
-try { const saved = JSON.parse(localStorage.getItem('haulist_v2')); if (saved && saved.budget) state = saved; } catch(e) {}
+try {   // demo mode only: restore this device's saved demo data, keeping any new fields from newer versions
+  const cfg = window.HAULIST_CONFIG || {}, hosted = cfg.SUPABASE_URL && !/PASTE/.test(cfg.SUPABASE_URL);
+  const saved = !hosted && JSON.parse(localStorage.getItem('haulist_v2'));
+  if (saved && saved.budget) state = Object.assign(state, saved);
+} catch(e) {}
+state.pantry ||= []; state.trips ||= []; state.layout ||= {};
+if (!Array.isArray(state.favStores) || !state.favStores.length) state.favStores = ['Publix','Target','Walmart','Costco','Aldi'];
 try { const dk = localStorage.getItem('haulist_dark'); if (dk !== null) state.dark = dk === '1'; } catch(e) {}
 boot();
 function resetDemo(){ try { localStorage.removeItem('haulist_v2'); } catch(e) {} location.reload(); }
