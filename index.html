@@ -138,7 +138,7 @@ nav .plus{width:54px;height:54px;border-radius:18px;background:linear-gradient(1
     <button data-tab="home"><span class="ic">🏠</span>Home</button>
     <button data-tab="shop"><span class="ic">🛒</span>Shop</button>
     <button data-tab="add"><span class="plus">+</span></button>
-    <button data-tab="deals"><span class="ic">📉</span>Deals</button>
+    <button data-tab="pantry"><span class="ic">🧺</span>Pantry</button>
     <button data-tab="family"><span class="ic">👨‍👩‍👧</span>Family</button>
   </nav>
 </div>
@@ -180,6 +180,8 @@ let state = {
   ],
   history: {c1:['Bread','Coffee','Greek yogurt','Avocados'], c2:['Dish soap','Trash bags']},  // "buy again" chips
   dark: true,
+  pantry: [], trips: [], layout: {},
+  favStores: ['Publix','Target','Walmart','Costco','Aldi'],
   // ---- Budget sync (Paycheck Planner) ----
   budget: {
     url: '', key: '',              // filled in on Family → Budget sync
@@ -202,10 +204,13 @@ const $ = s => document.querySelector(s);
 const who = id => state.members.find(f => f.id === id) || {name:'?',color:'#666'};
 const money = n => n == null || isNaN(n) ? 'Add price' : '$' + Number(n).toFixed(2);
 const uid = () => Math.random().toString(36).slice(2, 9);
+const cost = i => (i.price||0) * (i.qty||1);                          // price × quantity
+const hidden = i => !!(i.due && i.due > Date.now());                  // repeat item waiting to come back
+const hm = t => t ? new Date(t).toLocaleTimeString([], {hour:'numeric', minute:'2-digit'}) : '';
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const avatar = (id, size='') => { const f = who(id); return `<div class="av ${size}" style="background:${esc(f.color)}">${esc((f.name||'?')[0])}</div>`; };
 const cat = id => state.categories.find(c => c.id === id);
-function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),1900); }
+function toast(msg){ const t=$('#toast'); t.onclick=null; t.style.pointerEvents='none'; t.textContent=msg; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),1900); }
 function buzz(){ try{ navigator.vibrate && navigator.vibrate(15); }catch(e){} }
 
 const AISLES = {
@@ -295,16 +300,21 @@ function render(){
   if (tab === 'home')   v.innerHTML = openCat ? catView() : homeView();
   if (tab === 'shop')   v.innerHTML = shopView();
   if (tab === 'deals')  v.innerHTML = dealsView();
+  if (tab === 'pantry') v.innerHTML = pantryView();
   if (tab === 'family') v.innerHTML = familyView();
 }
-const shoppable = () => state.categories.filter(c => !c.gift).flatMap(c => c.items.map(i => ({...i, cid:c.id, cname:c.name, cemoji:c.emoji})));
+const shoppable = () => state.categories.filter(c => !c.gift).flatMap(c => c.items.filter(i => !hidden(i)).map(i => ({...i, cid:c.id, cname:c.name, cemoji:c.emoji})));
 
 function homeView(){
   const all = shoppable(), todo = all.filter(i=>!i.done);
-  const est = todo.reduce((s,i)=>s+(i.price||0),0);
+  const est = todo.reduce((s,i)=>s+cost(i),0);
   const shopper = state.members.find(m => m.shopping && m.id !== me);
+  const drops = state.categories.flatMap(c => c.items.filter(i=>i.oldPrice && !hidden(i))).length;
+  const lowN = state.pantry.filter(p=>p.low).length;
   return `
-    ${shopper ? `<div class="live"><div class="dot"></div>${avatar(shopper.id,'sm')} ${esc(shopper.name)} is shopping at ${esc(shopper.shopping)} right now</div>` : ''}
+    ${shopper ? `<div class="live" style="justify-content:space-between"><span class="row" style="gap:8px"><div class="dot"></div>${avatar(shopper.id,'sm')}
+      <span>${esc(shopper.name)} is at <b>${esc(shopper.shopping)}</b> · since ${hm(shopper.since)}</span></span>
+      <button class="btn" style="padding:6px 10px;white-space:nowrap" onclick="grabSheet('${shopper.id}')">🙋 Grab…</button></div>` : ''}
     <div class="hero tap" onclick="go('shop')">
       <div style="font-size:13px;font-weight:700;opacity:.85">${todo.length} items · about $${est.toFixed(2)}</div>
       <h3>Ready to shop?</h3>
@@ -315,15 +325,19 @@ function homeView(){
       <div class="grow"><div class="title">Found something in a store app?</div>
         <div class="sub">Copy its link → tap here → Paste. It lands on your list.</div></div>
       <span class="chip hot">Add</span></div>
+    ${drops ? `<div class="card row tap" onclick="go('deals')"><div class="thumb" style="width:46px;height:46px;font-size:22px">📉</div>
+      <div class="grow"><div class="title">${drops} price drop${drops>1?'s':''}</div><div class="sub">Things on your lists got cheaper</div></div><span style="color:var(--muted)">›</span></div>` : ''}
+    ${lowN ? `<div class="card row tap" onclick="go('pantry')"><div class="thumb" style="width:46px;height:46px;font-size:22px">🧺</div>
+      <div class="grow"><div class="title">${lowN} thing${lowN>1?'s':''} running low</div><div class="sub">Already added to your lists</div></div><span style="color:var(--muted)">›</span></div>` : ''}
     <div class="row" style="justify-content:space-between"><h2 style="margin:0">Categories</h2>
       <div class="stack">${state.members.map(m=>avatar(m.id,'sm')).join('')}</div></div>
     <div class="grid" style="margin-top:12px">
       ${state.categories.map(c => {
-        const n = c.items.length, d = c.gift ? c.items.filter(i=>i.claimedBy).length : c.items.filter(i=>i.done).length;
+        const vis = c.items.filter(i=>!hidden(i)), n = vis.length, d = vis.filter(i=>i.done).length;
         return `<div class="tile" style="background:${TILE_BG[c.bg % TILE_BG.length]}" onclick="openCat='${c.id}';render()">
           <div class="em">${c.emoji}</div>
           <div><div class="nm">${esc(c.name)}</div>
-          <div class="ct">${c.gift ? `${d}/${n} claimed` : `${n-d} to buy`}${left(budFor(c.id))!=null ? ` · $${left(budFor(c.id)).toFixed(0)} left`:''}</div>
+          <div class="ct">${n-d} to buy${left(budFor(c.id))!=null ? ` · $${left(budFor(c.id)).toFixed(0)} left`:''}</div>
           <div class="bar"><i style="width:${n? d/n*100 : 0}%"></i></div></div></div>`;
       }).join('')}
       <div class="tile new" onclick="newCategorySheet()">＋<br>New category</div>
@@ -332,38 +346,45 @@ function homeView(){
 
 function catView(){
   const c = cat(openCat);
-  const buyAgain = (state.history[c.id]||[]).filter(n => !c.items.some(i => i.name.toLowerCase()===n.toLowerCase() && !i.done));
+  const vis = c.items.filter(i=>!hidden(i)), later = c.items.filter(hidden);
+  const buyAgain = (state.history[c.id]||[]).filter(n => !c.items.some(i => i.name.toLowerCase()===n.toLowerCase()));
   return `<div class="back" onclick="openCat=null;render()">‹ Home</div>
-    <h2>${c.emoji} ${esc(c.name)} ${c.gift ? '<span class="chip hot">Gift list</span>':''}</h2>
-    ${budMeter(budFor(c.id), c.items.filter(i=>!i.done && !c.gift).reduce((s,i)=>s+(i.price||0),0))}
+    <h2>${c.emoji} ${esc(c.name)}</h2>
+    ${budMeter(budFor(c.id), vis.filter(i=>!i.done).reduce((s,i)=>s+cost(i),0))}
     <form onsubmit="event.preventDefault();quickAdd('${c.id}',this.q.value);this.q.value=''">
       <input name="q" placeholder="Add to ${esc(c.name)}…" autocomplete="off"></form>
-    ${buyAgain.length ? `<div class="cat">Buy again</div><div class="scroll">${buyAgain.map(n=>`<span class="chip" onclick="quickAdd('${c.id}','${esc(n)}')">+ ${esc(n)}</span>`).join('')}</div>` : ''}
+    ${buyAgain.length ? `<div class="cat">Buy again</div><div class="scroll">${buyAgain.map(n=>`<span class="chip" onclick="quickAdd('${c.id}',this.dataset.n)" data-n="${esc(n)}">+ ${esc(n)}</span>`).join('')}</div>` : ''}
     <div style="height:12px"></div>
-    ${c.items.map(i => c.gift ? giftItem(c,i) : listItem(c,i)).join('') || '<p class="sub">Empty — add something above or tap +.</p>'}
-    ${!c.gift && c.items.length ? `<button class="btn full primary" style="margin-top:8px" onclick="shopFilter='${c.id}';go('shop')">🛒 Shop just ${esc(c.name)}</button>` : ''}`;
+    ${vis.map(i => listItem(c,i)).join('') || '<p class="sub">Empty — add something above or tap +.</p>'}
+    ${vis.length ? `<div class="row" style="margin-top:6px"><button class="btn grow" onclick="clearList('${c.id}',true)">Clear checked</button>
+      <button class="btn grow" onclick="clearList('${c.id}',false)">Clear all</button></div>` : ''}
+    ${later.length ? `<div class="cat">🔁 Coming back</div>` + later.map(i => `<div class="item tap" onclick="itemSheet('${c.id}','${i.id}')">
+      <div class="grow"><div class="title">${esc(i.name)}</div><div class="sub">Back on the list in ${Math.ceil((i.due-Date.now())/864e5)} day(s)</div></div>
+      <button class="btn" onclick="event.stopPropagation();bringBack('${c.id}','${i.id}')">Add now</button></div>`).join('') : ''}
+    ${vis.length ? `<button class="btn full primary" style="margin-top:10px" onclick="shopFilter='${c.id}';go('shop')">🛒 Shop just ${esc(c.name)}</button>` : ''}`;
+}
+function chips(i){
+  return [i.qty>1 ? `<span class="chip hot">×${i.qty}</span>` : '',
+    i.status==='out' ? '<span class="chip" style="color:#FF4D6A">Out of stock</span>' : '',
+    i.reqBy ? `<span class="chip hot">🙋 ${esc(who(i.reqBy).name)} asked</span>` : '',
+    i.repeat ? `<span class="chip">🔁 ${i.repeat}d</span>` : '',
+    i.store ? `<span class="chip">${esc(i.store)}</span>` : '',
+    i.oldPrice ? '<span class="chip drop">Price drop</span>' : ''].join('');
+}
+function extras(i){
+  const r = i.repl === 'none' ? "Don't replace" : i.repl ? 'If out: ' + esc(i.repl) : '';
+  return [i.note ? `<i>${esc(i.note)}</i>` : '', r].filter(Boolean).join(' · ');
 }
 function listItem(c,i){
+  const ex = extras(i);
   return `<div class="item ${i.done?'done':''}">
     <div class="check" onclick="toggle('${c.id}','${i.id}')"></div>
-    <div class="grow"><div class="title">${esc(i.name)}</div>
-      <div class="row" style="margin-top:4px">${i.store?`<span class="chip">${esc(i.store)}</span>`:''}${i.oldPrice?'<span class="chip drop">Price drop</span>':''}</div></div>
+    <div class="grow tap" onclick="itemSheet('${c.id}','${i.id}')"><div class="title">${esc(i.name)}</div>
+      ${ex ? `<div class="sub" style="margin-top:2px">${ex}</div>` : ''}
+      <div class="row" style="margin-top:4px;flex-wrap:wrap">${chips(i)}</div></div>
     ${i.url ? `<a href="${esc(i.url)}" target="_blank" rel="noopener" class="chip" style="text-decoration:none" title="Open at ${esc(i.store||'store')}">↗</a>` : ''}
-    <span class="price tap" style="font-size:13px" onclick="editPrice('${c.id}','${i.id}')">${money(i.price)}</span>
+    <span class="price tap" style="font-size:13px" onclick="itemSheet('${c.id}','${i.id}')">${money(i.price)}</span>
     ${avatar(i.by,'sm')}</div>`;
-}
-function giftItem(c,i){
-  const mine = i.claimedBy === me;
-  return `<div class="item">
-    <div class="thumb">${i.emoji||'🎁'}</div>
-    <div class="grow"><div class="title">${esc(i.name)}</div>
-      <div class="row" style="margin:4px 0 6px;flex-wrap:wrap"><span class="chip">${esc(i.store||'')}</span>
-        ${i.oldPrice?`<span class="chip drop">↓ ${Math.round((1-i.price/i.oldPrice)*100)}%</span>`:''}
-        ${i.claimedBy?`<span class="chip hot">${esc(who(i.claimedBy).name)} has it</span>`:''}</div>
-      <div class="row" style="justify-content:space-between">
-        <span class="price tap" onclick="editPrice('${c.id}','${i.id}')">${money(i.price)}</span>
-        ${i.claimedBy ? `<button class="btn" onclick="claim('${c.id}','${i.id}')">${mine?'Unclaim':'Claimed'}</button>`
-                      : `<button class="btn primary" onclick="claim('${c.id}','${i.id}')">I've got it</button>`}</div></div></div>`;
 }
 
 /* ---------- Begin Shopping mode ---------- */
@@ -372,11 +393,15 @@ function shopView(){
   const stores = [...new Set(items.filter(i=>!i.done).map(i=>i.store).filter(Boolean))];
   if (shopFilter.startsWith('store:')) items = items.filter(i => i.store === shopFilter.slice(6));
   else if (shopFilter !== 'all') items = items.filter(i => i.cid === shopFilter);
-  const done = items.filter(i=>i.done).length, total = items.length;
+  const here = hereStore(), order = state.layout[here] || [];
+  const act = items.filter(i => i.status !== 'out');
+  const done = act.filter(i=>i.done).length, total = act.length;
   const pct = total ? done/total : 0, C = 2*Math.PI*33;
-  const cart = items.filter(i=>i.done).reduce((s,i)=>s+(i.price||0),0);
+  const cart = items.filter(i=>i.done).reduce((s,i)=>s+cost(i),0);
   const groups = {};
-  items.forEach(i => (groups[i.aisle || i.cname] ||= []).push(i));
+  items.forEach(i => (groups[i.reqBy && !i.done ? '🙋 Requests' : i.status==='out' ? '❌ Out of stock' : (i.aisle || i.cname)] ||= []).push(i));
+  const rank = g => g === '🙋 Requests' ? -1 : g === '❌ Out of stock' ? 1e6 : (order.indexOf(g) < 0 ? 1e5 : order.indexOf(g));
+  const keys = Object.keys(groups).sort((a,b) => rank(a)-rank(b) || a.localeCompare(b));
   const chip = (key,label) => `<span class="chip ${shopFilter===key?'on':''}" onclick="shopFilter='${key}';render()">${label}</span>`;
   return `<h2>${pct===1 && total ? '🎉 All done!' : 'Shopping'}</h2>
     <div class="shophead">
@@ -387,25 +412,50 @@ function shopView(){
       <div class="grow"><div class="title">${done} of ${total} in the cart</div>
         <div class="sub" style="margin:3px 0 8px">Cart so far: <b class="grad">$${cart.toFixed(2)}</b></div>
         <div class="row"><button class="btn primary" onclick="finishTrip()">Finish trip</button>
-        <button class="btn" onclick="presenceSheet()">${who(me).shopping ? '📍 '+esc(who(me).shopping) : "📍 I'm shopping"}</button></div></div>
+        <button class="btn" onclick="presenceSheet()">${who(me).shopping ? '📍 '+esc(who(me).shopping) : "📍 Check in"}</button></div></div>
     </div>
-    ${(() => { // one budget meter per budget category in this cart
+    ${who(me).shopping ? `<div class="live">✅ Checked in at <b>${esc(who(me).shopping)}</b> · ${hm(who(me).since)}${order.length ? ' · sorted like your last trip here' : ''}</div>` : ''}
+    ${(() => {
       const byBud = {};
-      items.filter(i=>i.done).forEach(i => { const b = B().map[i.cid]; if (b) byBud[b] = (byBud[b]||0) + (i.price||0); });
+      items.filter(i=>i.done).forEach(i => { const b = B().map[i.cid]; if (b) byBud[b] = (byBud[b]||0) + cost(i); });
       const shown = [...new Set(items.map(i => B().map[i.cid]).filter(Boolean))];
       return shown.map(b => budMeter(budCat(b), byBud[b]||0)).join('');
     })()}
-    <div class="scroll">${chip('all','All')}${state.categories.filter(c=>!c.gift).map(c=>chip(c.id, c.emoji+' '+esc(c.name))).join('')}
+    <div class="scroll">${chip('all','All')}${state.categories.map(c=>chip(c.id, c.emoji+' '+esc(c.name))).join('')}
       ${stores.map(s=>chip('store:'+s,'📍 '+esc(s))).join('')}</div>
-    ${Object.keys(groups).sort().map(g => `<div class="cat">${esc(g)}</div>` +
-      groups[g].sort((a,b)=>a.done-b.done).map(i => `
-      <div class="sitem ${i.done?'done':''}" id="s_${i.id}" onclick="toggle('${i.cid}','${i.id}',true)">
+    ${keys.map(g => `<div class="cat">${esc(g)}</div>` +
+      groups[g].sort((a,b)=>a.done-b.done).map(i => {
+        const ex = extras(i);
+        return `<div class="sitem ${i.done?'done':''} ${i.status==='out'?'done':''}" id="s_${i.id}" onclick="toggle('${i.cid}','${i.id}',true)">
         <div class="check"></div>
-        <div class="grow"><div class="title">${esc(i.name)}</div><div class="sub">${i.cemoji} ${esc(i.cname)}${i.store?' · '+esc(i.store):''}</div></div>
-        <b style="font-size:14px">${i.price?'$'+i.price.toFixed(2):''}</b></div>`).join('')).join('')
+        <div class="grow"><div class="title">${i.qty>1?`<b class="grad">×${i.qty}</b> `:''}${esc(i.name)}</div>
+          ${ex ? `<div class="sub">${ex}</div>` : ''}
+          <div class="sub">${i.cemoji} ${esc(i.cname)}${i.store?' · '+esc(i.store):''}${i.reqBy?` · 🙋 ${esc(who(i.reqBy).name)}`:''}</div></div>
+        <b style="font-size:14px">${i.price?'$'+cost(i).toFixed(2):''}</b>
+        <button class="btn ghost" style="font-size:20px;padding:4px 8px" onclick="event.stopPropagation();shopItemSheet('${i.cid}','${i.id}')">⋯</button></div>`;
+      }).join('')).join('')
       || '<p class="sub" style="margin-top:14px">Nothing to buy here. Nice.</p>'}
     <div style="height:10px"></div>
     <button class="btn full" onclick="sendInstacart()">🥕 Send what's left to Instacart</button>`;
+}
+
+/* ---------- Running Low (pantry) ---------- */
+function pantryView(){
+  const low = state.pantry.filter(p=>p.low), ok = state.pantry.filter(p=>!p.low);
+  const row = p => { const c = cat(p.cat);
+    return `<div class="item"><div class="grow"><div class="title">${esc(p.name)}</div><div class="sub">${c ? c.emoji+' '+esc(c.name) : 'No category'}</div></div>
+      ${p.low ? `<button class="btn" onclick="lowToggle('${p.id}')">✓ On the list</button>` : `<button class="btn primary" onclick="lowToggle('${p.id}')">Running low</button>`}
+      <button class="btn ghost" onclick="delPantryItem('${p.id}')">✕</button></div>`; };
+  const ideas = ['Milk','Eggs','Bread','Coffee','Rice','Toilet paper','Paper towels','Dish soap','Laundry detergent','Toothpaste']
+    .filter(n => !state.pantry.some(p => p.name.toLowerCase() === n.toLowerCase()));
+  return `<h2>🧺 Running Low</h2>
+    <p class="sub" style="margin-bottom:12px">Things you keep at home. Tap <b>Running low</b> and it goes straight onto the shopping list.</p>
+    <form onsubmit="event.preventDefault();addPantry(this.q.value,this.c.value);this.q.value=''">
+      <div class="row"><input name="q" placeholder="Something you keep at home" autocomplete="off"><select name="c" style="width:42%">${catOptions()}</select></div></form>
+    ${ideas.length ? `<div class="cat">Quick add</div><div class="scroll">${ideas.map(n=>`<span class="chip" data-n="${n}" onclick="addPantry(this.dataset.n)">+ ${n}</span>`).join('')}</div>` : ''}
+    ${low.length ? `<div class="cat">On the shopping list</div>` + low.map(row).join('') : ''}
+    <div class="cat">At home</div>
+    ${ok.map(row).join('') || '<p class="sub">Add the things you always keep stocked.</p>'}`;
 }
 
 function dealsView(){
@@ -430,6 +480,10 @@ function familyView(){
       <div class="grow"><div class="title">Budget sync · Paycheck Planner</div>
       <div class="sub">${B().url ? '🟢 Connected' : '⚪ Demo mode'}${B().queue.length ? ` · ${B().queue.length} trip(s) waiting to sync` : ''}</div></div>
       <span style="color:var(--muted)">›</span></div>
+    ${moneyCard()}
+    <div class="card"><div class="title">⭐ Favorite stores</div><div class="sub">Used for check-in and shopping by store.</div>
+      <div class="scroll" style="margin:10px 0;flex-wrap:wrap">${state.favStores.map(s=>`<span class="chip" style="padding:8px 12px">${esc(s)} <a style="cursor:pointer;margin-left:4px" data-s="${esc(s)}" onclick="favDel(this.dataset.s)">✕</a></span>`).join('')}</div>
+      <form onsubmit="event.preventDefault();favAdd(this.f.value);this.f.value=''"><input name="f" placeholder="Add a store"></form></div>
     <div class="cat">Members${db?'':' · tap to test as them'}</div>
     <button class="btn full" style="margin-bottom:10px" onclick="profileSheet()">✏️ Edit my profile</button>
     ${state.members.map(m => `<div class="item ${db && m.id!==me?'':'tap'}" onclick="${db ? (m.id===me?'profileSheet()':'') : `me='${m.id}';render();toast('Now acting as ${esc(m.name)}')`}">
@@ -541,20 +595,176 @@ function budgetSheet(){
     <p class="sub" style="margin-top:10px">Budget names match Setup → "Your categories" in Paycheck Planner.</p>`);
 }
 function saveBudget(){ B().url = $('#bu').value.trim(); B().key = $('#bk').value.trim(); saveSettings(); pullBudget(); budgetSheet(); }
-function editPrice(cid, iid){
-  const i = cat(cid).items.find(x=>x.id===iid);
-  sheet(`<h2>${esc(i.name)}</h2><label>Price</label><input id="ep" type="number" step="0.01" value="${i.price??''}" placeholder="0.00">
-    <button class="btn full primary" style="margin-top:14px" onclick="setPrice('${cid}','${iid}')">Save</button>
+/* ---------- item details ---------- */
+let edQty = 1;
+function itemSheet(cid, iid){
+  const i = cat(cid).items.find(x=>x.id===iid); if (!i) return;
+  edQty = i.qty || 1;
+  const rsel = i.repl === 'none' ? 'none' : i.repl ? 'custom' : '';
+  sheet(`<h2>Edit item</h2>
+    <label>Name</label><input id="en" value="${esc(i.name)}">
+    <div class="row" style="gap:12px;align-items:flex-end">
+      <div class="grow"><label>Price (each)</label><input id="ep" type="number" step="0.01" inputmode="decimal" value="${i.price??''}" placeholder="0.00"></div>
+      <div><label>How many</label><div class="row"><button class="btn" onclick="qtyStep(-1)">−</button>
+        <b id="eq" style="min-width:26px;text-align:center;font-size:18px">${edQty}</b><button class="btn" onclick="qtyStep(1)">+</button></div></div></div>
+    <label>Note (size, color, brand…)</label><input id="eno" value="${esc(i.note||'')}">
+    <label>If they're out…</label>
+    <select id="er" onchange="$('#erc').style.display=this.value==='custom'?'block':'none'">
+      <option value="" ${rsel===''?'selected':''}>Get something similar</option>
+      <option value="none" ${rsel==='none'?'selected':''}>Don't replace it</option>
+      <option value="custom" ${rsel==='custom'?'selected':''}>Get this instead…</option></select>
+    <input id="erc" style="margin-top:8px;display:${rsel==='custom'?'block':'none'}" value="${rsel==='custom'?esc(i.repl):''}" placeholder="Replacement">
+    <label>Repeat</label>
+    <select id="ert">${[[0,'Just this once'],[7,'Every week'],[14,'Every 2 weeks'],[21,'Every 3 weeks'],[30,'Every month']]
+      .map(([v,t])=>`<option value="${v}" ${(i.repeat||0)==v?'selected':''}>${t}</option>`).join('')}</select>
+    <div class="row" style="justify-content:space-between;margin-top:14px">
+      <div><div class="title">Out of stock</div><div class="sub">Stays on the list for next time</div></div>
+      <div class="switch ${i.status==='out'?'on':''}" id="eo" onclick="this.classList.toggle('on')"></div></div>
+    <button class="btn full primary" style="margin-top:16px" onclick="saveItemSheet('${cid}','${iid}')">Save</button>
     <button class="btn full ghost" style="margin-top:6px" onclick="removeItem('${cid}','${iid}')">Remove item</button>`);
-  setTimeout(()=>$('#ep').focus(),50);
 }
-function setPrice(cid,iid){ const i = cat(cid).items.find(x=>x.id===iid); i.price = parseFloat($('#ep').value)||null; putItem(cid, i); closeSheet(); render(); }
+function qtyStep(d){ edQty = Math.max(1, Math.min(99, edQty + d)); $('#eq').textContent = edQty; }
+function saveItemSheet(cid, iid){
+  const i = cat(cid).items.find(x=>x.id===iid);
+  i.name = $('#en').value.trim() || i.name;
+  i.price = parseFloat($('#ep').value) || null;
+  i.qty = edQty; i.note = $('#eno').value.trim();
+  const r = $('#er').value; i.repl = r === 'custom' ? $('#erc').value.trim() : r;
+  i.repeat = +$('#ert').value || 0;
+  i.status = $('#eo').classList.contains('on') ? 'out' : '';
+  if (i.status === 'out') i.done = false;
+  putItem(cid, i); closeSheet(); render(); toast('Saved');
+}
 function removeItem(cid,iid){ const c=cat(cid); c.items=c.items.filter(x=>x.id!==iid); delItem(iid); closeSheet(); render(); toast('Removed'); }
+function shopItemSheet(cid, iid){
+  const i = cat(cid).items.find(x=>x.id===iid);
+  const custom = i.repl && i.repl !== 'none';
+  sheet(`<h2>${i.qty>1?'×'+i.qty+' ':''}${esc(i.name)}</h2>
+    ${extras(i) ? `<p class="sub">${extras(i)}</p>` : ''}
+    <button class="btn full primary" style="margin-top:12px" onclick="shopMark('${cid}','${iid}','got')">✅ Got it</button>
+    ${custom ? `<button class="btn full" style="margin-top:8px" onclick="shopMark('${cid}','${iid}','repl')">🔄 Got the replacement: ${esc(i.repl)}</button>` : ''}
+    <button class="btn full" style="margin-top:8px" onclick="shopMark('${cid}','${iid}','out')">❌ Out of stock${i.repl==='none'?'':' (skip for now)'}</button>
+    <button class="btn full ghost" style="margin-top:8px" onclick="itemSheet('${cid}','${iid}')">✏️ Edit details</button>`);
+}
+function shopMark(cid, iid, how){
+  const i = cat(cid).items.find(x=>x.id===iid);
+  if (how === 'out') { i.status = 'out'; i.done = false; toast('Marked out of stock — stays for next trip'); }
+  else { i.status = ''; i.done = true; if (how === 'repl') i.note = ((i.note||'') + ' (got: ' + i.repl + ')').trim(); noteAisle(i); }
+  putItem(cid, i); closeSheet(); buzz(); render();
+}
+function bringBack(cid, iid){ const i = cat(cid).items.find(x=>x.id===iid); i.due = null; i.done = false; putItem(cid, i); render(); toast(`${i.name} is back on the list`); }
+
+/* ---------- list clear with undo ---------- */
+function clearList(cid, onlyChecked){
+  const c = cat(cid);
+  const gone = c.items.filter(i => !hidden(i) && (!onlyChecked || i.done));
+  if (!gone.length) return toast(onlyChecked ? 'Nothing checked off yet' : 'List is already empty');
+  c.items = c.items.filter(i => !gone.includes(i)); gone.forEach(i => delItem(i.id)); render();
+  toastUndo(`Cleared ${gone.length} item${gone.length>1?'s':''}`, () => { gone.forEach(i => { c.items.push(i); putItem(cid, i); }); render(); toast('Restored'); });
+}
+function toastUndo(msg, undo){
+  const t = $('#toast'); t.innerHTML = `${esc(msg)} · <u>Undo</u>`; t.classList.add('show'); t.style.pointerEvents = 'auto';
+  t.onclick = () => { t.onclick = null; t.style.pointerEvents = 'none'; t.classList.remove('show'); undo(); };
+  clearTimeout(t._h); t._h = setTimeout(() => { t.classList.remove('show'); t.style.pointerEvents = 'none'; t.onclick = null; }, 10000);
+}
+
+/* ---------- grab requests ---------- */
+function grabSheet(sid){
+  const s = who(sid);
+  sheet(`<h2>🙋 Ask ${esc(s.name)} to grab…</h2><p class="sub">${esc(s.name)} is at ${esc(s.shopping)}. It shows at the top of their list.</p>
+    <label>What do you need?</label><input id="gi" autocomplete="off">
+    <label>Category</label><select id="gc">${catOptions()}</select>
+    <button class="btn full primary" style="margin-top:14px" onclick="sendGrab('${sid}')">Send request</button>`);
+  setTimeout(()=>$('#gi') && $('#gi').focus(),50);
+}
+function sendGrab(sid){
+  const name = $('#gi').value.trim(); if (!name) return toast('Type an item');
+  const c = cat($('#gc').value);
+  const i = {id:uid(), name, aisle:aisleFor(name), by:me, reqBy:me, done:false, price:null, qty:1, at:Date.now()};
+  c.items.push(i); putItem(c.id, i); closeSheet(); render(); toast(`Asked ${who(sid).name} to grab ${name}`);
+}
+
+/* ---------- check-in + favorite stores ---------- */
+const hereStore = () => who(me).shopping || (shopFilter.startsWith('store:') ? shopFilter.slice(6) : '');
+let tripOrder = [];
+function noteAisle(i){ const a = i.aisle || i.cname; if (a && !tripOrder.includes(a)) tripOrder.push(a); }
+function presenceSheet(){
+  sheet(`<h2>📍 Check in</h2><p class="sub">Your family sees where you are so they can add last-second items. The list also sorts itself the way you walked this store last time.</p>
+    <div class="grid" style="margin:12px 0">${state.favStores.map(s=>`<button class="btn" style="padding:14px" data-s="${esc(s)}" onclick="checkIn(this.dataset.s)">${esc(s)}</button>`).join('')}</div>
+    <form onsubmit="event.preventDefault();checkIn(this.s.value.trim())"><input name="s" placeholder="Other store…"></form>
+    ${who(me).shopping ? `<button class="btn full ghost" style="margin-top:8px" onclick="setPresence('');closeSheet()">I'm done shopping</button>`:''}`);
+}
+function checkIn(store){
+  if (!store) return;
+  setPresence(store); closeSheet();
+  if (!state.favStores.includes(store)) { state.favStores.push(store); saveSettings(); }
+  toast(`✅ Checked in at ${store} — family can see it`);
+}
+function favAdd(s){ s = (s||'').trim(); if (!s || state.favStores.includes(s)) return; state.favStores.push(s); saveSettings(); render(); }
+function favDel(s){ state.favStores = state.favStores.filter(x => x !== s); saveSettings(); render(); }
+
+/* ---------- running low ---------- */
+function addPantry(name, cid){
+  name = (name||'').trim(); if (!name) return;
+  if (state.pantry.some(p => p.name.toLowerCase() === name.toLowerCase())) return toast(`${name} is already here`);
+  const g = state.categories.find(c => /grocer/i.test(c.name)) || state.categories[0];
+  const p = {id:uid(), name, cat: cid || (/paper|soap|detergent|toilet|tooth/i.test(name) ? (state.categories.find(c=>/home/i.test(c.name))||g)?.id : g?.id), low:false, at:Date.now()};
+  state.pantry.push(p); putPantry(p); render();
+}
+function lowToggle(pid){
+  const p = state.pantry.find(x=>x.id===pid); p.low = !p.low; putPantry(p);
+  const c = cat(p.cat);
+  if (p.low && c) {
+    const ex = c.items.find(i => i.name.toLowerCase() === p.name.toLowerCase());
+    if (ex) { if (hidden(ex) || ex.done) { ex.due = null; ex.done = false; putItem(c.id, ex); } }
+    else { const i = {id:uid(), name:p.name, aisle:aisleFor(p.name), by:me, done:false, price:null, qty:1, at:Date.now()}; c.items.push(i); putItem(c.id, i); }
+    toast(`${p.name} → ${c.name} list`);
+  }
+  render();
+}
+function delPantryItem(pid){ const p = state.pantry.find(x=>x.id===pid); state.pantry = state.pantry.filter(x=>x.id!==pid); delPantry(pid); render();
+  toastUndo(`Removed ${p.name}`, () => { state.pantry.push(p); putPantry(p); render(); }); }
+
+/* ---------- who paid / split ---------- */
+function balances(){
+  const bal = {};
+  state.trips.forEach(t => {
+    const s = (t.split||[]).filter(Boolean); if (!t.paidBy || !s.length) return;
+    const share = (+t.total||0) / s.length;
+    s.forEach(m => { if (m === t.paidBy) return; bal[m] = (bal[m]||0) - share; bal[t.paidBy] = (bal[t.paidBy]||0) + share; });
+  });
+  return bal;
+}
+function debts(){  // turn balances into "A owes B $X" lines
+  const b = balances(), owe = [], get = [];
+  for (const [id,v] of Object.entries(b)) { if (v < -0.005) owe.push([id,-v]); if (v > 0.005) get.push([id,v]); }
+  const out = [];
+  while (owe.length && get.length) {
+    const amt = Math.min(owe[0][1], get[0][1]);
+    out.push({from:owe[0][0], to:get[0][0], amt});
+    owe[0][1] -= amt; get[0][1] -= amt;
+    if (owe[0][1] < 0.005) owe.shift(); if (get[0][1] < 0.005) get.shift();
+  }
+  return out;
+}
+function moneyCard(){
+  const d = debts();
+  return `<div class="card"><div class="title">💸 Money between you</div>
+    ${d.length ? d.map(x => `<div class="row" style="justify-content:space-between;padding:8px 0">
+      <span>${esc(who(x.from).name)} owes ${esc(who(x.to).name)} <b>$${x.amt.toFixed(2)}</b></span>
+      <button class="btn" onclick="settle('${x.from}','${x.to}',${x.amt.toFixed(2)})">Settle up</button></div>`).join('')
+      : '<div class="sub">All even. Split a trip at Finish trip to track who owes who.</div>'}</div>`;
+}
+function settle(from, to, amt){
+  saveTrip({id:uid()+Date.now().toString(36), lines:[], kind:'settle', paidBy:from, split:[to], total:amt});
+  render(); toast(`Marked $${(+amt).toFixed(2)} as paid`);
+}
 
 /* ===================== 5. ACTIONS ===================== */
 function toggle(cid, iid, inShop){
   const i = cat(cid).items.find(x=>x.id===iid);
-  i.done = !i.done; putItem(cid, i); buzz(); render();
+  i.done = !i.done; if (i.done) i.status = ''; if (inShop && i.done) noteAisle({...i, cname:cat(cid).name});
+  putItem(cid, i); buzz(); render();
   if (inShop && i.done) { const el = $('#s_'+iid); el && el.classList.add('pop'); }
   if (inShop) { const all = shoppable().filter(x => shopFilter==='all' || x.cid===shopFilter || 'store:'+x.store===shopFilter);
     if (all.length && all.every(x=>x.done)) { confetti(); toast('🎉 Everything\'s in the cart!'); } }
@@ -569,59 +779,86 @@ function quickAdd(cid, name){
   name = (name||'').trim(); if (!name) return;
   if (/^https?:\/\//i.test(name)) { openCat = cid; return openAdd(name); }   // pasted a link → link flow
   const c = cat(cid);
-  if (c.items.some(x=>x.name.toLowerCase()===name.toLowerCase() && !x.done)) return toast(`${name} is already on the list`);
-  c.items.push({id:uid(), name, aisle:aisleFor(name), by:me, done:false, price:null, at:Date.now()});
+  const ex = c.items.find(x=>x.name.toLowerCase()===name.toLowerCase());
+  if (ex && hidden(ex)) return bringBack(cid, ex.id);
+  if (ex && !ex.done) return toast(`${name} is already on the list`);
+  c.items.push({id:uid(), name, aisle:aisleFor(name), by:me, done:false, price:null, qty:1, at:Date.now()});
   putItem(cid, c.items[c.items.length-1]);
   render(); toast(`${name} → ${aisleFor(name)}`);
 }
 function finishTrip(){
   const bought = shoppable().filter(i=>i.done);
   if (!bought.length) return toast('Check some items off first');
-  const total = bought.reduce((s,i)=>s+(i.price||0),0);
-  // group the cart into budget lines: one per budget category
   const lines = {};
   bought.forEach(i => {
     const b = B().map[i.cid] || '(not linked)';
     const L = lines[b] ||= {category:b, label: i.cname + ' trip', amount:0, count:0};
-    L.amount += i.price || 0; L.count++;
+    L.amount += cost(i); L.count++;
   });
-  pendingTrip = {id:uid()+Date.now().toString(36), date:new Date().toISOString().slice(0,10), shopper:who(me).name, lines:Object.values(lines)};
-  const noPrice = bought.filter(i=>!i.price).length;
+  pendingTrip = {id:uid()+Date.now().toString(36), date:new Date().toISOString().slice(0,10), shopper:who(me).name,
+    lines:Object.values(lines), paidBy:me, split:[], store:hereStore(), count:bought.length,
+    total:bought.reduce((s,i)=>s+cost(i),0), noPrice:bought.filter(i=>!i.price).length};
+  drawFinish(); confetti();
+}
+function drawFinish(){
+  const t = pendingTrip, pick = (id, on, fn) => `<span class="chip ${on?'on':''}" style="padding:8px 12px;cursor:pointer" onclick="${fn}('${id}')">${esc(who(id).name)}</span>`;
   sheet(`<div style="text-align:center;font-size:54px">🎉</div><h2 style="text-align:center">Trip complete!</h2>
-    <div class="code grad" style="font-size:34px;letter-spacing:0">$${total.toFixed(2)}</div>
-    <p class="sub" style="text-align:center">${bought.length} items bought by ${esc(who(me).name)}</p>
-    <div class="card" style="margin-top:14px">
-      <div class="row" style="justify-content:space-between"><div class="title">Log to Paycheck Planner</div>
+    <div class="code grad" style="font-size:34px;letter-spacing:0">$${t.total.toFixed(2)}</div>
+    <p class="sub" style="text-align:center">${t.count} items${t.store ? ' at ' + esc(t.store) : ''}</p>
+    ${t.noPrice ? `<div class="hint" style="text-align:center">⚠️ ${t.noPrice} item(s) have no price — tap ⋯ → Edit to add them first.</div>` : ''}
+    <div class="card" style="margin-top:12px">
+      <div class="title">Who paid?</div><div class="scroll" style="margin:8px 0">${state.members.map(m=>pick(m.id, t.paidBy===m.id, 'setPayer')).join('')}</div>
+      <div class="title" style="margin-top:6px">Split with <span class="sub">(optional)</span></div>
+      <div class="scroll" style="margin-top:8px">${state.members.map(m=>pick(m.id, t.split.includes(m.id), 'toggleSplit')).join('')}</div>
+      ${t.split.length ? `<div class="sub" style="margin-top:6px">${t.split.length} way${t.split.length>1?'s':''}: $${(t.total/t.split.length).toFixed(2)} each</div>` : ''}
+    </div>
+    <div class="card">
+      <div class="row" style="justify-content:space-between"><div class="title">Count it in the budget</div>
         <div class="switch ${logIt?'on':''}" onclick="logIt=!logIt;this.classList.toggle('on')"></div></div>
-      ${pendingTrip.lines.map(l=>`<div class="row" style="justify-content:space-between;padding:6px 0;font-size:14px">
+      ${t.lines.map(l=>`<div class="row" style="justify-content:space-between;padding:6px 0;font-size:14px">
         <span>${esc(l.label)} → <b>${esc(l.category)}</b></span><b>$${l.amount.toFixed(2)}</b></div>`).join('')}
-      ${noPrice ? `<div class="hint">⚠️ ${noPrice} item(s) have no price — tap prices to fix before finishing.</div>`:''}
     </div>
     <button class="btn full primary" style="margin-top:6px" onclick="clearTrip()">Done</button>`);
-  confetti();
 }
+function setPayer(id){ pendingTrip.paidBy = id; drawFinish(); }
+function toggleSplit(id){ const s = pendingTrip.split; s.includes(id) ? s.splice(s.indexOf(id),1) : s.push(id); drawFinish(); }
 let pendingTrip = null, logIt = true;
 async function clearTrip(){
-  if (logIt && pendingTrip) {
-    // update the budget numbers right away (feels instant), then send to the sheet
-    pendingTrip.lines.forEach(l => { const bc = budCat(l.category); if (bc) bc.spent += l.amount; });
-    B().queue.push(pendingTrip);
+  const t = pendingTrip; if (!t) return;
+  if (logIt) {
+    t.lines.forEach(l => { const bc = budCat(l.category); if (bc) bc.spent += l.amount; });
+    B().queue.push(t);
     const sent = B().url ? await flushQueue() : 0;
-    toast(sent ? `Logged ${pendingTrip.lines.length} line(s) to Paycheck Planner` : B().url ? 'Saved — will sync when online' : 'Budget updated for the family');
-    if (!B().url) B().queue = [];   // nowhere to send yet
-    saveTrip(pendingTrip);
-    saveSettings();
+    if (!B().url) B().queue = [];
+    toast(sent ? `Logged to Paycheck Planner` : B().url ? 'Saved — will sync when online' : 'Budget updated for the family');
   }
+  saveTrip({...t, kind:'trip', budget: logIt});
+  saveSettings();
   pendingTrip = null; logIt = true;
+  // learn the store layout from the order you checked things off
+  if (t.store && tripOrder.length) {
+    const old = state.layout[t.store] || [];
+    state.layout[t.store] = tripOrder.concat(old.filter(a => !tripOrder.includes(a)));
+  }
+  tripOrder = [];
+  const boughtNames = [];
   state.categories.forEach(c => {
-    const got = c.items.filter(i=>i.done && !c.gift);
+    const got = c.items.filter(i => i.done && !hidden(i));
     if (got.length) { state.history[c.id] = [...new Set([...got.map(i=>i.name), ...(state.history[c.id]||[])])].slice(0,10); putCat(c); }
-    got.forEach(i => delItem(i.id));
-    if (!c.gift) c.items = c.items.filter(i=>!i.done);
+    got.forEach(i => {
+      boughtNames.push(i.name.toLowerCase());
+      if (i.repeat) { Object.assign(i, {done:false, status:'', reqBy:null, due: Date.now() + i.repeat*864e5}); putItem(c.id, i); }   // comes back later
+      else delItem(i.id);
+    });
+    c.items = c.items.filter(i => !(i.done && !i.repeat));
+    c.items.forEach(i => { if (i.status === 'out') { i.status = ''; putItem(c.id, i); } });   // try again next trip
   });
+  state.pantry.forEach(p => { if (p.low && boughtNames.includes(p.name.toLowerCase())) { p.low = false; putPantry(p); } });   // restocked
+  saveSettings();
   setPresence('');
   closeSheet(); shopFilter='all'; go('home'); toast('Trip saved');
 }
+
 function sendInstacart(){
   const items = shoppable().filter(i=>!i.done).map(i=>i.name);
   sheet(`<h2>🥕 Send to Instacart</h2>
@@ -657,19 +894,23 @@ function confetti(){
 
 /* ===================== 5b. LIVE FAMILY SYNC (Supabase) ===================== */
 let db = null, sb = null, fam = null, names = {}, sheetLocked = false;
-const live = {cats:[], items:[], members:[], settings:null};
+const live = {cats:[], items:[], members:[], settings:null, trips:[], pantry:[]};
 const clean = o => JSON.parse(JSON.stringify(o));
 function chk(r){ if (r && r.error) toast('Sync error: ' + r.error.message); }
 
 // ---- rows ↔ app objects ----
 const toRow = (i, cid) => ({id:i.id, family_id:fam.id, cat:cid, name:i.name, aisle:i.aisle||null, store:i.store||null,
-  price:i.price ?? null, old_price:i.oldPrice ?? null, url:i.url||null, by:i.by||null, done:!!i.done, at:i.at||Date.now()});
+  price:i.price ?? null, old_price:i.oldPrice ?? null, url:i.url||null, by:i.by||null, done:!!i.done, at:i.at||Date.now(),
+  qty:i.qty||1, note:i.note||null, repl:i.repl||null, status:i.status||'', req_by:i.reqBy||null, repeat_days:i.repeat||null, due:i.due||null});
 const fromRow = r => ({id:r.id, cat:r.cat, name:r.name, aisle:r.aisle, store:r.store, price:r.price==null?null:+r.price,
-  oldPrice:r.old_price==null?null:+r.old_price, url:r.url, by:r.by, done:r.done, at:+r.at});
+  oldPrice:r.old_price==null?null:+r.old_price, url:r.url, by:r.by, done:r.done, at:+r.at,
+  qty:r.qty||1, note:r.note||'', repl:r.repl||'', status:r.status||'', reqBy:r.req_by||null, repeat:r.repeat_days||0, due:r.due?+r.due:null});
 
 // ---- writes (do nothing in demo mode) ----
 function putItem(cid, i){ if (db) sb.from('items').upsert(toRow(i, cid)).then(chk); }
 function delItem(iid){ if (db) sb.from('items').delete().eq('id', iid).then(chk); }
+function putPantry(p){ if (db) sb.from('pantry').upsert({id:p.id, family_id:fam.id, name:p.name, cat:p.cat||null, low:!!p.low, at:p.at||Date.now()}).then(chk); }
+function delPantry(pid){ if (db) sb.from('pantry').delete().eq('id', pid).then(chk); }
 function putCat(c, order){
   if (!db) return;
   const prev = live.cats.find(x => x.id === c.id) || {};
@@ -679,21 +920,21 @@ function putCat(c, order){
 function saveSettings(){
   if (!db) return;
   sb.from('settings').upsert({family_id:fam.id, month:B().month, budgets:B().cats, map:B().map,
-    store_cat:state.storeCat||{}, sheet_url:B().url||'', sheet_key:B().key||''}).then(chk);
+    store_cat:state.storeCat||{}, sheet_url:B().url||'', sheet_key:B().key||'',
+    fav_stores:state.favStores, layout:state.layout}).then(chk);
 }
-function saveTrip(t){ if (db) sb.from('trips').insert({id:t.id, family_id:fam.id, by:me, lines:t.lines,
-  total:t.lines.reduce((s,l)=>s+l.amount,0)}).then(chk); }
+function saveTrip(t){
+  const row = {id:t.id, by:me, lines:t.lines||[], total:+(t.total ?? (t.lines||[]).reduce((s,l)=>s+l.amount,0)).toFixed(2),
+    paid_by:t.paidBy||me, split:t.split||[], kind:t.kind||'trip', store:t.store||null, count:t.count||0, budget:t.budget!==false};
+  state.trips.push({...row, paidBy:row.paid_by, at:Date.now()});
+  if (db) sb.from('trips').insert({...row, family_id:fam.id}).then(chk);
+}
 function setPresence(store){
-  const m = who(me); m.shopping = store;
-  if (db) sb.from('members').update({shopping:store, since:Date.now()}).eq('family_id', fam.id).eq('user_id', me).then(chk);
+  const m = who(me); m.shopping = store; m.since = Date.now();
+  if (db) sb.from('members').update({shopping:store, since:m.since}).eq('family_id', fam.id).eq('user_id', me).then(chk);
   render();
 }
-function presenceSheet(){
-  sheet(`<h2>📍 Where are you shopping?</h2><p class="sub">Your family sees it on Home, so they can add last-second items.</p>
-    <div class="scroll" style="margin:12px 0">${['Publix','Target','Walmart','Costco','Aldi'].map(s=>`<span class="chip" onclick="setPresence('${s}');closeSheet();toast('Family can see you\\'re at ${s}')">${s}</span>`).join('')}</div>
-    <form onsubmit="event.preventDefault();setPresence(this.s.value.trim());closeSheet()"><input name="s" placeholder="Other store…"></form>
-    ${who(me).shopping ? `<button class="btn full ghost" style="margin-top:8px" onclick="setPresence('');closeSheet()">I'm done shopping</button>`:''}`);
-}
+
 
 // ---- reads: rebuild the screens from the live data ----
 function rebuild(){
@@ -707,6 +948,9 @@ function rebuild(){
   if (st.map) B().map = {...st.map};
   if (st.url !== undefined) { B().url = st.url || ''; B().key = st.key || ''; }
   state.storeCat = {...(st.storeCat||{})};
+  if (Array.isArray(st.favStores) && st.favStores.length) state.favStores = st.favStores.slice();
+  state.layout = clean(st.layout || {});
+  state.trips = live.trips.slice(); state.pantry = live.pantry.map(p => ({...p}));
   const fresh = m => m.shopping && Date.now() - (m.since||0) < 3*3600e3;      // presence expires after 3h
   state.members = live.members.map(m => ({...m, shopping: fresh(m) ? m.shopping : '',
     status: fresh(m) ? `Shopping at ${m.shopping} · now` : ''}));
@@ -719,7 +963,9 @@ async function loadTable(t){
   if (t === 'categories') live.cats = data.map(c => ({...c, order:c.ord}));
   if (t === 'items') live.items = data.map(fromRow);
   if (t === 'members') { live.members = data.map(m => ({...m, id:m.user_id})); names = Object.fromEntries(data.map(m => [m.user_id, m.name])); }
-  if (t === 'settings') { const x = data[0]; live.settings = x ? {budgets:x.budgets, month:x.month, map:x.map, storeCat:x.store_cat, url:x.sheet_url, key:x.sheet_key} : null; }
+  if (t === 'settings') { const x = data[0]; live.settings = x ? {budgets:x.budgets, month:x.month, map:x.map, storeCat:x.store_cat, url:x.sheet_url, key:x.sheet_key, favStores:x.fav_stores, layout:x.layout} : null; }
+  if (t === 'trips') live.trips = data.map(x => ({...x, paidBy:x.paid_by, total:+x.total, at:Date.parse(x.created_at)}));
+  if (t === 'pantry') live.pantry = data;
   rebuild();
 }
 
@@ -901,13 +1147,15 @@ async function enterFamily(fid){
   try { localStorage.setItem('haulist_family', f.id); } catch(e) {}
   state.categories = []; state.members = []; state.history = {}; openCat = null;
   $('.banner').textContent = '🟢 Live · syncing with ' + f.name;
-  await Promise.all(['categories','items','members','settings'].map(loadTable));
+  await Promise.all(['categories','items','members','settings','trips','pantry'].map(loadTable));
   // live updates: on any change, re-read that table (small family data = fast)
   const timers = {}, refetch = t => { clearTimeout(timers[t]); timers[t] = setTimeout(() => loadTable(t), 250); };
   const ch = sb.channel('haulist-' + f.id);
-  ['categories','items','members','settings'].forEach(t => ch.on('postgres_changes', {event:'*', schema:'public', table:t}, p => {
-    if (t === 'items' && p.eventType === 'INSERT' && p.new.family_id === f.id && p.new.by !== me)
-      toast(`${names[p.new.by] || 'Someone'} added ${p.new.name}`);        // "Mom added Milk"
+  ['categories','items','members','settings','trips','pantry'].forEach(t => ch.on('postgres_changes', {event:'*', schema:'public', table:t}, p => {
+    if (t === 'items' && p.eventType === 'INSERT' && p.new.family_id === f.id && p.new.by !== me) {
+      if (p.new.req_by && who(me).shopping) { toast(`🙋 ${names[p.new.req_by] || 'Someone'} asked you to grab ${p.new.name}`); buzz(); }
+      else toast(`${names[p.new.by] || 'Someone'} added ${p.new.name}`);        // "Mom added Milk"
+    }
     refetch(t);
   }));
   ch.subscribe();
