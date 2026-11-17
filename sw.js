@@ -1,6 +1,6 @@
 // Haulist service worker: keeps the app shell cached so it opens instantly / offline.
 // Bump VERSION whenever you upload a new index.html so phones get the update.
-const VERSION = 'haulist-v0.6.2';
+const VERSION = 'haulist-v0.6.3';
 const SHELL = ['./', 'index.html', 'config.js', 'manifest.json', 'icon.svg', 'icon-192.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(VERSION).then(c => c.addAll(SHELL))); self.skipWaiting(); });
 self.addEventListener('activate', e => {
@@ -11,6 +11,6 @@ self.addEventListener('fetch', e => {
   const u = new URL(e.request.url);
   if (e.request.method !== 'GET' || u.origin !== location.origin) return;   // never cache Supabase/API calls
   // network first (fresh app), fall back to cache when offline
-  e.respondWith(fetch(e.request).then(r => { const c = r.clone(); caches.open(VERSION).then(x => x.put(e.request, c)); return r; })
+  e.respondWith(fetch(e.request, {cache:'no-cache'}).then(r => { const c = r.clone(); caches.open(VERSION).then(x => x.put(e.request, c)); return r; })
     .catch(() => caches.match(e.request).then(r => r || caches.match('index.html'))));
 });

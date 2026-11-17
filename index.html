@@ -730,6 +730,8 @@ async function boot(){
   if (jc) { pendingJoin = jc.toUpperCase(); try { localStorage.setItem('haulist_join', pendingJoin); } catch(e) {} history.replaceState(null, '', location.pathname); }
   else { try { pendingJoin = localStorage.getItem('haulist_join') || ''; } catch(e) {} }
   if (pendingJoin) authMode = 'up';
+  state.categories = []; state.members = []; state.history = {}; openCat = null;   // hosted app: no sample data
+  $('.banner').textContent = 'Sign in to see your family list'; render();
   sb = supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
   sb.auth.onAuthStateChange(ev => { if (ev === 'PASSWORD_RECOVERY') setTimeout(() => newPwScreen(), 300); });
   const {data:{session}} = await sb.auth.getSession();
@@ -754,12 +756,13 @@ function authScreen(msg){
       <button class="${up?'on':''}" onclick="authMode='up';authScreen()">Create account</button></div>
     ${pendingJoin && !msg ? `<div class="live" style="margin-top:8px">🎉 You've been invited to a family. Create an account (or sign in) to join.</div>` : ''}
     ${msg ? `<div class="hint" style="text-align:center;margin:8px 0">${esc(msg)}</div>` : ''}
-    ${up ? `<label>First name</label><input id="an" autocomplete="given-name">` : ''}
-    <label>Email</label><input id="ae" type="email" autocomplete="email" value="${esc(lastEmail)}">
+    <form id="authForm" onsubmit="event.preventDefault();${up?'signUp()':'signIn()'}">
+    ${up ? `<label>First name</label><input id="an" name="name" autocomplete="given-name">` : ''}
+    <label>Email</label><input id="ae" name="email" type="email" autocomplete="username" value="${esc(lastEmail)}">
     <label>Password${up ? ' (at least 6 characters)' : ''}</label>
-    <div class="row"><input id="ap" type="password" autocomplete="${up?'new-password':'current-password'}">
-      <button class="btn" onclick="const p=$('#ap');p.type=p.type==='password'?'text':'password';this.textContent=p.type==='password'?'Show':'Hide'">Show</button></div>
-    <button class="btn full primary" style="margin-top:16px" onclick="${up?'signUp()':'signIn()'}">${up?'Create account':'Sign in'}</button>
+    <div class="row"><input id="ap" name="password" type="password" autocomplete="${up?'new-password':'current-password'}">
+      <button type="button" class="btn" onclick="const p=$('#ap');p.type=p.type==='password'?'text':'password';this.textContent=p.type==='password'?'Show':'Hide'">Show</button></div>
+    <button type="submit" class="btn full primary" style="margin-top:16px">${up?'Create account':'Sign in'}</button></form>
     ${up ? '' : `<button class="btn full ghost" style="margin-top:6px" onclick="forgotPw()">Forgot password?</button>`}`);
 }
 let lastEmail = '';
