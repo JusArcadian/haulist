@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Haulist — Prototype</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0E0F13; --card:#181A21; --card2:#20232C; --line:#2A2E39; --text:#F2F3F5; --muted:#8B90A0;
+  --accent:#FF6B3D; --accent2:#FFB23D; --good:#2ECC8F; --radius:18px;
+}
+.light{ --bg:#F5F6F8; --card:#FFFFFF; --card2:#EEF0F4; --line:#E1E4EA; --text:#14161B; --muted:#6B7080; }
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:Inter,system-ui,sans-serif;background:#000;color:var(--text);display:flex;justify-content:center}
+#app{width:100%;max-width:440px;min-height:100vh;background:var(--bg);position:relative;padding-bottom:100px;transition:background .2s;overflow-x:hidden}
+header{position:sticky;top:0;z-index:5;background:var(--bg);padding:18px 18px 10px;display:flex;align-items:center;justify-content:space-between}
+.logo{font-weight:900;font-size:24px;letter-spacing:-.5px}
+.logo span,.grad{background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.me{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);cursor:pointer}
+.av{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:13px;color:#fff;flex-shrink:0;border:2px solid var(--bg)}
+.av.sm{width:22px;height:22px;font-size:10px;border-width:1px}
+.av.lg{width:46px;height:46px;font-size:18px}
+.stack{display:flex}.stack .av{margin-left:-8px}.stack .av:first-child{margin-left:0}
+main{padding:0 18px}
+h2{font-size:21px;font-weight:800;margin:6px 0 12px;letter-spacing:-.3px}
+.sub{color:var(--muted);font-size:13px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px;margin-bottom:12px}
+.tap{cursor:pointer;transition:transform .1s}.tap:active{transform:scale(.97)}
+.grow{flex:1;min-width:0}
+.title{font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row{display:flex;align-items:center;gap:8px}
+.chip{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:4px 9px;border-radius:99px;background:var(--card2);color:var(--muted);white-space:nowrap}
+.chip.drop{background:rgba(46,204,143,.15);color:var(--good)}
+.chip.hot{background:rgba(255,107,61,.15);color:var(--accent)}
+.price{font-weight:700;font-size:15px}
+.old{text-decoration:line-through;color:var(--muted);font-size:12px;margin-left:4px;font-weight:500}
+.thumb{width:56px;height:56px;border-radius:14px;display:grid;place-items:center;font-size:26px;flex-shrink:0;background:var(--card2)}
+.btn{border:none;font-family:inherit;font-weight:600;font-size:13px;padding:9px 14px;border-radius:12px;cursor:pointer;background:var(--card2);color:var(--text)}
+.btn.primary{background:linear-gradient(90deg,var(--accent),var(--accent2));color:#fff}
+.btn.full{width:100%;padding:14px;font-size:15px;border-radius:14px}
+.btn.ghost{background:transparent;color:var(--muted);padding:6px}
+.back{display:inline-flex;gap:6px;color:var(--muted);font-size:14px;cursor:pointer;margin-bottom:8px}
+input,select{width:100%;font-family:inherit;font-size:15px;padding:13px 14px;border-radius:14px;border:1px solid var(--line);background:var(--card2);color:var(--text);outline:none}
+input:focus{border-color:var(--accent)}
+label{font-size:12px;color:var(--muted);font-weight:600;display:block;margin:12px 0 6px}
+.hint{font-size:12px;color:var(--accent2);margin-top:6px}
+/* hero */
+.hero{border-radius:24px;padding:20px;margin-bottom:16px;background:linear-gradient(135deg,#FF6B3D,#FF3D7F 55%,#8B5CF6);color:#fff;position:relative;overflow:hidden;cursor:pointer}
+.hero::after{content:"🛒";position:absolute;right:-6px;bottom:-14px;font-size:96px;opacity:.22;transform:rotate(-12deg)}
+.hero h3{font-size:24px;font-weight:900;letter-spacing:-.5px}
+.hero .go{display:inline-block;margin-top:14px;background:#fff;color:#FF3D7F;font-weight:800;padding:11px 18px;border-radius:99px;font-size:14px}
+.live{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:14px;background:rgba(46,204,143,.12);color:var(--good);font-size:13px;font-weight:600;margin-bottom:14px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--good);animation:pulse 1.4s infinite}
+@keyframes pulse{50%{opacity:.3;transform:scale(1.6)}}
+/* category grid */
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.tile{border-radius:20px;padding:16px;min-height:132px;display:flex;flex-direction:column;justify-content:space-between;cursor:pointer;position:relative;overflow:hidden;transition:transform .1s}
+.tile:active{transform:scale(.96)}
+.tile .em{font-size:30px}
+.tile .nm{font-weight:800;font-size:16px;color:#fff}
+.tile .ct{font-size:12px;color:rgba(255,255,255,.75);font-weight:600}
+.bar{height:5px;border-radius:9px;background:rgba(255,255,255,.2);margin-top:8px;overflow:hidden}
+.bar i{display:block;height:100%;background:#fff;border-radius:9px;transition:width .3s}
+.tile.new{background:var(--card);border:2px dashed var(--line);align-items:center;justify-content:center;color:var(--muted);font-weight:700}
+/* items */
+.item{display:flex;gap:12px;align-items:center;padding:12px;background:var(--card);border:1px solid var(--line);border-radius:16px;margin-bottom:8px}
+.check{width:28px;height:28px;border-radius:50%;border:2px solid var(--line);display:grid;place-items:center;flex-shrink:0;cursor:pointer;transition:all .18s}
+.done .check{background:var(--good);border-color:var(--good);transform:scale(1.08)}
+.done .check::after{content:"✓";color:#fff;font-weight:900;font-size:15px}
+.done .title{text-decoration:line-through;color:var(--muted)}
+.done{opacity:.6}
+.cat{font-size:12px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);margin:16px 0 8px}
+.scroll{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
+.scroll .chip{cursor:pointer;padding:8px 13px;font-size:12px}
+.scroll .chip.on{background:var(--text);color:var(--bg)}
+/* shop mode */
+.shophead{display:flex;align-items:center;gap:16px;padding:16px;border-radius:22px;background:var(--card);border:1px solid var(--line);margin-bottom:12px}
+.ring{width:78px;height:78px;flex-shrink:0;position:relative}
+.ring svg{transform:rotate(-90deg)}
+.ring b{position:absolute;inset:0;display:grid;place-items:center;font-size:18px;font-weight:900}
+.sitem{display:flex;align-items:center;gap:14px;padding:16px 14px;background:var(--card);border:1px solid var(--line);border-radius:18px;margin-bottom:8px;cursor:pointer;transition:all .2s}
+.sitem .check{width:32px;height:32px}
+.sitem.done{opacity:.45}
+.sitem.pop{animation:pop .35s}
+@keyframes pop{40%{transform:scale(1.04)}}
+/* nav */
+nav{position:fixed;bottom:0;width:100%;max-width:440px;background:var(--card);border-top:1px solid var(--line);display:flex;justify-content:space-around;align-items:center;padding:8px 6px 14px;z-index:10}
+nav button{background:none;border:none;color:var(--muted);font-family:inherit;font-size:11px;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;width:64px}
+nav button.on{color:var(--accent)}
+nav .ic{font-size:20px}
+nav .plus{width:54px;height:54px;border-radius:18px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;font-size:28px;display:grid;place-items:center;margin-top:-26px;box-shadow:0 8px 24px rgba(255,107,61,.4)}
+/* sheet */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;z-index:20;justify-content:center;align-items:flex-end}
+.overlay.show{display:flex}
+.sheet{width:100%;max-width:440px;background:var(--bg);border-radius:24px 24px 0 0;padding:10px 18px 28px;max-height:90vh;overflow-y:auto;animation:up .22s ease}
+@keyframes up{from{transform:translateY(40px);opacity:0}}
+.grab{width:40px;height:5px;border-radius:9px;background:var(--line);margin:0 auto 14px}
+.seg{display:flex;background:var(--card2);border-radius:14px;padding:4px;margin-bottom:6px}
+.seg button{flex:1;border:none;background:none;color:var(--muted);font-family:inherit;font-weight:600;font-size:13px;padding:10px;border-radius:11px;cursor:pointer}
+.seg button.on{background:var(--card);color:var(--text)}
+.pick{display:flex;flex-wrap:wrap;gap:8px}
+.pick span{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;font-size:20px;background:var(--card2);cursor:pointer;border:2px solid transparent}
+.pick span.on{border-color:var(--accent)}
+.result{display:flex;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+.code{font-size:30px;font-weight:900;letter-spacing:4px;text-align:center;padding:14px;border-radius:16px;background:var(--card2);margin:10px 0}
+.toast{position:fixed;bottom:112px;left:50%;transform:translateX(-50%);background:var(--text);color:var(--bg);padding:11px 18px;border-radius:99px;font-size:13px;font-weight:600;opacity:0;transition:opacity .2s;pointer-events:none;z-index:40;white-space:nowrap}
+.toast.show{opacity:1}
+.switch{width:46px;height:28px;border-radius:99px;background:var(--line);position:relative;cursor:pointer;transition:background .2s;flex-shrink:0}
+.switch::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;transition:left .2s}
+.switch.on{background:var(--accent)}.switch.on::after{left:21px}
+.banner{font-size:12px;color:var(--muted);text-align:center;padding:4px 18px 6px}
+.bud{padding:14px;border-radius:18px;background:var(--card);border:1px solid var(--line);margin-bottom:12px}
+.bud .bbar{height:8px;border-radius:9px;background:var(--card2);overflow:hidden;margin-top:8px;position:relative}
+.bud .bbar i{position:absolute;left:0;top:0;bottom:0;border-radius:9px;transition:width .4s}
+.over{color:#FF4D6A!important}
+.confetti{position:fixed;top:-12px;width:10px;height:14px;z-index:50;pointer-events:none;animation:fall linear forwards}
+@keyframes fall{to{transform:translateY(105vh) rotate(720deg)}}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="logo">Haul<span>ist</span></div>
+    <div class="me" id="meBadge" onclick="go('family')"></div>
+  </header>
+  <div class="banner">Test build · saves on this device only</div>
+  <main id="view"></main>
+  <nav>
+    <button data-tab="home"><span class="ic">🏠</span>Home</button>
+    <button data-tab="shop"><span class="ic">🛒</span>Shop</button>
+    <button data-tab="add"><span class="plus">+</span></button>
+    <button data-tab="deals"><span class="ic">📉</span>Deals</button>
+    <button data-tab="family"><span class="ic">👨‍👩‍👧</span>Family</button>
+  </nav>
+</div>
+<div class="overlay" id="overlay"><div class="sheet" id="sheet"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ===================== 1. DATA (Stage 2 moves this into Supabase) ===================== */
+const COLORS = ['#FF6B3D','#8B5CF6','#22B8CF','#2ECC8F','#F43F5E','#EAB308'];
+const EMOJIS = ['🛒','🏠','🎁','🥕','🧴','🐶','🎒','🎄','🧸','🔧','💊','🍼'];
+const TILE_BG = ['linear-gradient(135deg,#2ECC8F,#139A6B)','linear-gradient(135deg,#22B8CF,#1D6FD1)','linear-gradient(135deg,#8B5CF6,#5B2FD1)',
+                 'linear-gradient(135deg,#FF6B3D,#E53E5C)','linear-gradient(135deg,#EAB308,#E07B12)','linear-gradient(135deg,#F43F5E,#B0247E)'];
+
+let state = {
+  familyName: 'Our Family',
+  inviteCode: 'HAUL-7K2P',
+  members: [
+    {id:'t', name:'Terrence', color:'#FF6B3D', role:'Admin',  status:'Added 2 items today'},
+    {id:'m', name:'Mom',      color:'#8B5CF6', role:'Member', status:'Shopping at Target · now', shopping:'Target'},
+    {id:'j', name:'Jordan',   color:'#22B8CF', role:'Member', status:'Last active 1h ago'},
+  ],
+  categories: [
+    {id:'c1', name:'Groceries', emoji:'🥕', bg:0, gift:false, items:[
+      {id:'i1', name:'Milk', aisle:'Dairy & Eggs', store:'Publix', price:4.29, by:'m', done:false},
+      {id:'i2', name:'Eggs', aisle:'Dairy & Eggs', store:'Publix', price:3.99, by:'m', done:false},
+      {id:'i3', name:'Bananas', aisle:'Produce', store:'Publix', price:1.89, by:'t', done:false},
+      {id:'i4', name:'Chicken breast', aisle:'Meat & Seafood', store:'Publix', price:9.49, by:'m', done:false},
+      {id:'i5', name:'Rice', aisle:'Pantry', store:'Publix', price:3.49, by:'j', done:true},
+    ]},
+    {id:'c2', name:'Home Stuff', emoji:'🏠', bg:1, gift:false, items:[
+      {id:'i6', name:'Paper towels', aisle:'Household', store:'Target', price:12.99, by:'j', done:false},
+      {id:'i7', name:'Bath Towel Set (6 pc)', aisle:'Household', store:'Walmart', price:24.97, by:'m', done:false},
+      {id:'i8', name:'LED Desk Lamp', aisle:'Other', store:'Amazon', price:32.99, oldPrice:39.99, by:'t', done:false, url:'https://amazon.com'},
+    ]},
+    {id:'c3', name:'Wants', emoji:'🛍️', bg:2, gift:false, items:[
+      {id:'i9', name:'Sony WH-1000XM5 Headphones', aisle:'Electronics', store:'Amazon', price:279.99, oldPrice:399.99, by:'j', done:false, url:'https://www.amazon.com/'},
+      {id:'i11', name:'Instant Pot Duo 6qt', aisle:'Kitchen', store:'Target', price:69.99, oldPrice:89.99, by:'m', done:false, url:'https://www.target.com/'},
+    ]},
+  ],
+  history: {c1:['Bread','Coffee','Greek yogurt','Avocados'], c2:['Dish soap','Trash bags']},  // "buy again" chips
+  dark: true,
+  // ---- Budget sync (Paycheck Planner) ----
+  budget: {
+    url: '', key: '',              // filled in on Family → Budget sync
+    month: 'November 2026 (demo)',
+    map: {c1:'Groceries', c2:'Shopping', c3:'Other wants'},   // Haulist category → budget category
+    cats: [                        // demo numbers until the real sheet is connected
+      {name:'Groceries', group:'Needs', goal:400, spent:257.40},
+      {name:'Personal care', group:'Needs', goal:60, spent:18},
+      {name:'Shopping', group:'Wants', goal:150, spent:121.50},
+      {name:'Other wants', group:'Wants', goal:100, spent:40},
+      {name:'Entertainment', group:'Fun', goal:80, spent:35},
+    ],
+    queue: [],                     // trips waiting to sync (offline / blocked)
+  },
+};
+let me = 't', tab = 'home', openCat = null, shopFilter = 'all';
+
+/* ===================== 2. HELPERS ===================== */
+const $ = s => document.querySelector(s);
+const who = id => state.members.find(f => f.id === id) || {name:'?',color:'#666'};
+const money = n => n == null || isNaN(n) ? 'Add price' : '$' + Number(n).toFixed(2);
+const uid = () => Math.random().toString(36).slice(2, 9);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const avatar = (id, size='') => { const f = who(id); return `<div class="av ${size}" style="background:${f.color}">${f.name[0]}</div>`; };
+const cat = id => state.categories.find(c => c.id === id);
+function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),1900); }
+function buzz(){ try{ navigator.vibrate && navigator.vibrate(15); }catch(e){} }
+
+const AISLES = {
+  'Produce':['apple','banana','lettuce','tomato','onion','avocado','potato','lemon','lime','berr','grape','carrot','pepper','spinach','fruit'],
+  'Dairy & Eggs':['milk','cheese','yogurt','butter','egg','cream'],
+  'Meat & Seafood':['chicken','beef','pork','turkey','fish','salmon','shrimp','steak','bacon','sausage'],
+  'Bakery':['bread','bagel','tortilla','bun','muffin'],
+  'Pantry':['rice','pasta','cereal','beans','sauce','oil','flour','sugar','coffee','tea','soup','spice'],
+  'Frozen':['frozen','ice cream','pizza'],
+  'Household':['paper','towel','detergent','soap','trash','tissue','foil','sponge','bleach'],
+};
+function aisleFor(name){
+  const n = name.toLowerCase();
+  for (const [a, words] of Object.entries(AISLES)) if (words.some(w => n.includes(w))) return a;
+  return 'Other';
+}
+const STORES = {'amazon':'Amazon','target':'Target','walmart':'Walmart','bestbuy':'Best Buy','nike':'Nike','costco':'Costco','etsy':'Etsy','ebay':'eBay','homedepot':'Home Depot','publix':'Publix','apple':'Apple','ikea':'IKEA'};
+function parseLink(raw){
+  let u; try { u = new URL(raw.trim()); } catch { return null; }
+  const host = u.hostname.replace(/^www\./,'').split('.');
+  const key = host.length > 1 ? host[host.length-2] : host[0];
+  const store = STORES[key] || key.charAt(0).toUpperCase() + key.slice(1);
+  const seg = u.pathname.split('/').filter(s => /[a-z]/i.test(s) && /[-_]/.test(s)).sort((a,b)=>b.length-a.length)[0] || '';
+  const name = decodeURIComponent(seg).replace(/[-_]+/g,' ').replace(/\b\w/g,c=>c.toUpperCase()).trim();
+  return { store, name, url: u.href };
+}
+const CATALOG = [
+  {name:'Apple AirPods Pro (2nd Gen)', store:'Amazon', price:189.99, emoji:'🎧'},
+  {name:'Apple AirPods Pro (2nd Gen)', store:'Target', price:199.99, emoji:'🎧'},
+  {name:'Apple AirPods Pro (2nd Gen)', store:'Best Buy', price:189.99, emoji:'🎧'},
+  {name:'Ninja Air Fryer 4qt', store:'Walmart', price:79.00, emoji:'🍟'},
+  {name:'Ninja Air Fryer 4qt', store:'Amazon', price:84.99, emoji:'🍟'},
+  {name:'Tide Pods 81ct', store:'Target', price:21.99, emoji:'🧺'},
+  {name:'Tide Pods 81ct', store:'Walmart', price:19.97, emoji:'🧺'},
+  {name:'Stanley Quencher 40oz', store:'Target', price:45.00, emoji:'🥤'},
+  {name:'Keurig K-Mini Coffee Maker', store:'Amazon', price:79.99, emoji:'☕'},
+];
+
+/* ===================== 2b. BUDGET SYNC ===================== */
+const B = () => state.budget;
+const budCat = name => B().cats.find(c => c.name === name);
+const budFor = cid => budCat(B().map[cid]);
+const left = bc => bc && bc.goal != null ? bc.goal - bc.spent : null;
+
+// Draws one budget meter. "extra" = money in the cart that isn't logged yet
+function budMeter(bc, extra = 0){
+  if (!bc) return '';
+  const l = left(bc);
+  if (l == null) return `<div class="bud"><div class="title">💰 ${esc(bc.name)}</div><div class="sub">Spent $${bc.spent.toFixed(2)} this month · no goal set</div></div>`;
+  const after = l - extra, used = Math.min(1, (bc.spent + extra) / bc.goal);
+  const color = after < 0 ? '#FF4D6A' : used > .8 ? '#EAB308' : '#2ECC8F';
+  return `<div class="bud"><div class="row" style="justify-content:space-between">
+      <div class="title">💰 ${esc(bc.name)}</div><b class="${l<0?'over':''}">$${l.toFixed(2)} left</b></div>
+    <div class="bbar"><i style="width:${Math.min(1,bc.spent/bc.goal)*100}%;background:${color};opacity:.45"></i>
+      <i style="width:${used*100}%;background:${color}"></i></div>
+    <div class="sub" style="margin-top:6px">${extra ? `After this cart: <b class="${after<0?'over':''}">$${after.toFixed(2)}</b>${after<0?' — over budget!':''} · `:''}$${bc.spent.toFixed(0)} of $${bc.goal} · ${esc(B().month)}</div></div>`;
+}
+
+// Talks to HaulistSync.gs. Always POST + text/plain (avoids the browser's CORS "preflight" check)
+async function callSheet(payload){
+  if (!B().url) throw new Error('not connected');
+  const r = await fetch(B().url, {method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify({key:B().key, ...payload})});
+  const j = await r.json();
+  if (!j.ok) throw new Error(j.error || 'sync failed');
+  return j;
+}
+async function pullBudget(){
+  try { const j = await callSheet({action:'getBudgets'}); B().cats = j.categories; B().month = j.month; render(); toast('Budget updated from Paycheck Planner'); }
+  catch(e){ toast(B().url ? "Preview can't reach Google — works once hosted (Stage 2)" : 'Using demo budget numbers'); }
+}
+async function flushQueue(){
+  const q = B().queue; let sent = 0;
+  for (const trip of [...q]) {
+    try { await callSheet({action:'logTrip', trip}); q.splice(q.indexOf(trip),1); sent++; } catch(e){ break; }
+  }
+  return sent;
+}
+
+/* ===================== 3. SCREENS ===================== */
+function go(t){ tab = t; openCat = null; render(); window.scrollTo(0,0); }
+function render(){
+  try { localStorage.setItem('haulist_v2', JSON.stringify(state)); } catch(e) {}   // keep data on this phone
+  $('#app').classList.toggle('light', !state.dark);
+  $('#meBadge').innerHTML = `${esc(who(me).name)} ${avatar(me)}`;
+  document.querySelectorAll('nav button[data-tab]').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
+  const v = $('#view');
+  if (tab === 'home')   v.innerHTML = openCat ? catView() : homeView();
+  if (tab === 'shop')   v.innerHTML = shopView();
+  if (tab === 'deals')  v.innerHTML = dealsView();
+  if (tab === 'family') v.innerHTML = familyView();
+}
+const shoppable = () => state.categories.filter(c => !c.gift).flatMap(c => c.items.map(i => ({...i, cid:c.id, cname:c.name, cemoji:c.emoji})));
+
+function homeView(){
+  const all = shoppable(), todo = all.filter(i=>!i.done);
+  const est = todo.reduce((s,i)=>s+(i.price||0),0);
+  const shopper = state.members.find(m => m.shopping && m.id !== me);
+  return `
+    ${shopper ? `<div class="live"><div class="dot"></div>${avatar(shopper.id,'sm')} ${esc(shopper.name)} is shopping at ${esc(shopper.shopping)} right now</div>` : ''}
+    <div class="hero tap" onclick="go('shop')">
+      <div style="font-size:13px;font-weight:700;opacity:.85">${todo.length} items · about $${est.toFixed(2)}</div>
+      <h3>Ready to shop?</h3>
+      <span class="go">Begin Shopping →</span>
+    </div>
+    <div class="card row tap" onclick="openAdd()">
+      <div class="thumb" style="width:46px;height:46px;font-size:22px">🔗</div>
+      <div class="grow"><div class="title">Found something in a store app?</div>
+        <div class="sub">Copy its link → tap here → Paste. It lands on your list.</div></div>
+      <span class="chip hot">Add</span></div>
+    <div class="row" style="justify-content:space-between"><h2 style="margin:0">Categories</h2>
+      <div class="stack">${state.members.map(m=>avatar(m.id,'sm')).join('')}</div></div>
+    <div class="grid" style="margin-top:12px">
+      ${state.categories.map(c => {
+        const n = c.items.length, d = c.gift ? c.items.filter(i=>i.claimedBy).length : c.items.filter(i=>i.done).length;
+        return `<div class="tile" style="background:${TILE_BG[c.bg % TILE_BG.length]}" onclick="openCat='${c.id}';render()">
+          <div class="em">${c.emoji}</div>
+          <div><div class="nm">${esc(c.name)}</div>
+          <div class="ct">${c.gift ? `${d}/${n} claimed` : `${n-d} to buy`}${left(budFor(c.id))!=null ? ` · $${left(budFor(c.id)).toFixed(0)} left`:''}</div>
+          <div class="bar"><i style="width:${n? d/n*100 : 0}%"></i></div></div></div>`;
+      }).join('')}
+      <div class="tile new" onclick="newCategorySheet()">＋<br>New category</div>
+    </div>`;
+}
+
+function catView(){
+  const c = cat(openCat);
+  const buyAgain = (state.history[c.id]||[]).filter(n => !c.items.some(i => i.name.toLowerCase()===n.toLowerCase() && !i.done));
+  return `<div class="back" onclick="openCat=null;render()">‹ Home</div>
+    <h2>${c.emoji} ${esc(c.name)} ${c.gift ? '<span class="chip hot">Gift list</span>':''}</h2>
+    ${budMeter(budFor(c.id), c.items.filter(i=>!i.done && !c.gift).reduce((s,i)=>s+(i.price||0),0))}
+    <form onsubmit="event.preventDefault();quickAdd('${c.id}',this.q.value);this.q.value=''">
+      <input name="q" placeholder="Add to ${esc(c.name)}…" autocomplete="off"></form>
+    ${buyAgain.length ? `<div class="cat">Buy again</div><div class="scroll">${buyAgain.map(n=>`<span class="chip" onclick="quickAdd('${c.id}','${esc(n)}')">+ ${esc(n)}</span>`).join('')}</div>` : ''}
+    <div style="height:12px"></div>
+    ${c.items.map(i => c.gift ? giftItem(c,i) : listItem(c,i)).join('') || '<p class="sub">Empty — add something above or tap +.</p>'}
+    ${!c.gift && c.items.length ? `<button class="btn full primary" style="margin-top:8px" onclick="shopFilter='${c.id}';go('shop')">🛒 Shop just ${esc(c.name)}</button>` : ''}`;
+}
+function listItem(c,i){
+  return `<div class="item ${i.done?'done':''}">
+    <div class="check" onclick="toggle('${c.id}','${i.id}')"></div>
+    <div class="grow"><div class="title">${esc(i.name)}</div>
+      <div class="row" style="margin-top:4px">${i.store?`<span class="chip">${esc(i.store)}</span>`:''}${i.oldPrice?'<span class="chip drop">Price drop</span>':''}</div></div>
+    ${i.url ? `<a href="${esc(i.url)}" target="_blank" rel="noopener" class="chip" style="text-decoration:none" title="Open at ${esc(i.store||'store')}">↗</a>` : ''}
+    <span class="price tap" style="font-size:13px" onclick="editPrice('${c.id}','${i.id}')">${money(i.price)}</span>
+    ${avatar(i.by,'sm')}</div>`;
+}
+function giftItem(c,i){
+  const mine = i.claimedBy === me;
+  return `<div class="item">
+    <div class="thumb">${i.emoji||'🎁'}</div>
+    <div class="grow"><div class="title">${esc(i.name)}</div>
+      <div class="row" style="margin:4px 0 6px;flex-wrap:wrap"><span class="chip">${esc(i.store||'')}</span>
+        ${i.oldPrice?`<span class="chip drop">↓ ${Math.round((1-i.price/i.oldPrice)*100)}%</span>`:''}
+        ${i.claimedBy?`<span class="chip hot">${esc(who(i.claimedBy).name)} has it</span>`:''}</div>
+      <div class="row" style="justify-content:space-between">
+        <span class="price tap" onclick="editPrice('${c.id}','${i.id}')">${money(i.price)}</span>
+        ${i.claimedBy ? `<button class="btn" onclick="claim('${c.id}','${i.id}')">${mine?'Unclaim':'Claimed'}</button>`
+                      : `<button class="btn primary" onclick="claim('${c.id}','${i.id}')">I've got it</button>`}</div></div></div>`;
+}
+
+/* ---------- Begin Shopping mode ---------- */
+function shopView(){
+  let items = shoppable();
+  const stores = [...new Set(items.filter(i=>!i.done).map(i=>i.store).filter(Boolean))];
+  if (shopFilter.startsWith('store:')) items = items.filter(i => i.store === shopFilter.slice(6));
+  else if (shopFilter !== 'all') items = items.filter(i => i.cid === shopFilter);
+  const done = items.filter(i=>i.done).length, total = items.length;
+  const pct = total ? done/total : 0, C = 2*Math.PI*33;
+  const cart = items.filter(i=>i.done).reduce((s,i)=>s+(i.price||0),0);
+  const groups = {};
+  items.forEach(i => (groups[i.aisle || i.cname] ||= []).push(i));
+  const chip = (key,label) => `<span class="chip ${shopFilter===key?'on':''}" onclick="shopFilter='${key}';render()">${label}</span>`;
+  return `<h2>${pct===1 && total ? '🎉 All done!' : 'Shopping'}</h2>
+    <div class="shophead">
+      <div class="ring"><svg width="78" height="78"><circle cx="39" cy="39" r="33" stroke="var(--card2)" stroke-width="8" fill="none"/>
+        <circle cx="39" cy="39" r="33" stroke="url(#g)" stroke-width="8" fill="none" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${C*(1-pct)}" style="transition:stroke-dashoffset .4s"/>
+        <defs><linearGradient id="g"><stop offset="0" stop-color="#FF6B3D"/><stop offset="1" stop-color="#FFB23D"/></linearGradient></defs></svg>
+        <b>${Math.round(pct*100)}%</b></div>
+      <div class="grow"><div class="title">${done} of ${total} in the cart</div>
+        <div class="sub" style="margin:3px 0 8px">Cart so far: <b class="grad">$${cart.toFixed(2)}</b></div>
+        <button class="btn primary" onclick="finishTrip()">Finish trip</button></div>
+    </div>
+    ${(() => { // one budget meter per budget category in this cart
+      const byBud = {};
+      items.filter(i=>i.done).forEach(i => { const b = B().map[i.cid]; if (b) byBud[b] = (byBud[b]||0) + (i.price||0); });
+      const shown = [...new Set(items.map(i => B().map[i.cid]).filter(Boolean))];
+      return shown.map(b => budMeter(budCat(b), byBud[b]||0)).join('');
+    })()}
+    <div class="scroll">${chip('all','All')}${state.categories.filter(c=>!c.gift).map(c=>chip(c.id, c.emoji+' '+esc(c.name))).join('')}
+      ${stores.map(s=>chip('store:'+s,'📍 '+esc(s))).join('')}</div>
+    ${Object.keys(groups).sort().map(g => `<div class="cat">${esc(g)}</div>` +
+      groups[g].sort((a,b)=>a.done-b.done).map(i => `
+      <div class="sitem ${i.done?'done':''}" id="s_${i.id}" onclick="toggle('${i.cid}','${i.id}',true)">
+        <div class="check"></div>
+        <div class="grow"><div class="title">${esc(i.name)}</div><div class="sub">${i.cemoji} ${esc(i.cname)}${i.store?' · '+esc(i.store):''}</div></div>
+        <b style="font-size:14px">${i.price?'$'+i.price.toFixed(2):''}</b></div>`).join('')).join('')
+      || '<p class="sub" style="margin-top:14px">Nothing to buy here. Nice.</p>'}
+    <div style="height:10px"></div>
+    <button class="btn full" onclick="sendInstacart()">🥕 Send what's left to Instacart</button>`;
+}
+
+function dealsView(){
+  const deals = state.categories.flatMap(c => c.items.filter(i=>i.oldPrice).map(i=>({...i, cname:c.name})));
+  return `<h2>Price drops</h2><p class="sub" style="margin-bottom:12px">Things on your lists that got cheaper.</p>` +
+    (deals.map(i => `<div class="item"><div class="thumb">${i.emoji||'🏷️'}</div>
+      <div class="grow"><div class="title">${esc(i.name)}</div><div class="sub">${esc(i.store)} · ${esc(i.cname)}</div>
+      <div style="margin-top:6px"><span class="price" style="color:var(--good)">${money(i.price)}</span><span class="old">${money(i.oldPrice)}</span>
+      <span class="chip drop" style="margin-left:6px">Save $${(i.oldPrice-i.price).toFixed(2)}</span></div></div></div>`).join('') || '<p class="sub">No drops yet.</p>');
+}
+
+/* ---------- Family (Life360-style circle) ---------- */
+function familyView(){
+  return `<h2>👨‍👩‍👧 ${esc(state.familyName)}</h2>
+    <div class="card"><div class="title">Invite to your family</div>
+      <div class="sub">Share this code. They download Haulist, tap "Join a family" and enter it.</div>
+      <div class="code grad">${state.inviteCode}</div>
+      <div class="row"><button class="btn primary grow" onclick="copyCode()">Copy invite</button>
+        <button class="btn" onclick="state.inviteCode='HAUL-'+Math.random().toString(36).slice(2,6).toUpperCase();render();toast('New code made — old one stops working')">New code</button></div></div>
+    <div class="card row tap" onclick="budgetSheet()">
+      <div class="thumb" style="width:46px;height:46px;font-size:22px">💰</div>
+      <div class="grow"><div class="title">Budget sync · Paycheck Planner</div>
+      <div class="sub">${B().url ? '🟢 Connected' : '⚪ Demo mode'}${B().queue.length ? ` · ${B().queue.length} trip(s) waiting to sync` : ''}</div></div>
+      <span style="color:var(--muted)">›</span></div>
+    <div class="cat">Members · tap to test as them</div>
+    ${state.members.map(m => `<div class="item tap" onclick="me='${m.id}';render();toast('Now acting as ${esc(m.name)}')">
+      ${avatar(m.id,'lg')}<div class="grow"><div class="title">${esc(m.name)} ${m.id===me?'<span class="chip hot">You</span>':''}</div>
+      <div class="sub">${m.shopping?'<span style="color:var(--good)">● </span>':''}${esc(m.status)}</div></div>
+      <span class="chip">${m.role}</span></div>`).join('')}
+    <div class="cat">Join another family</div>
+    <form class="row" onsubmit="event.preventDefault();joinFamily(this.c.value);this.c.value=''">
+      <input name="c" placeholder="HAUL-XXXX" style="text-transform:uppercase"><button class="btn primary">Join</button></form>
+    <div class="card row" style="margin-top:16px;justify-content:space-between">
+      <div><div class="title">Dark mode</div><div class="sub">Easy on the eyes</div></div>
+      <div class="switch ${state.dark?'on':''}" onclick="state.dark=!state.dark;render()"></div></div>
+    <button class="btn full ghost" style="margin-top:8px" onclick="resetDemo()">Reset to sample data</button>`;
+}
+
+/* ===================== 4. SHEETS ===================== */
+let addMode = 'link', draft = null, newCat = {emoji:'🛒', bg:3, gift:false};
+function sheet(html){ $('#sheet').innerHTML = `<div class="grab"></div>` + html; $('#overlay').classList.add('show'); }
+function closeSheet(){ $('#overlay').classList.remove('show'); }
+function catOptions(){ return state.categories.map(c=>`<option value="${c.id}" ${c.id===openCat?'selected':''}>${c.emoji} ${esc(c.name)}</option>`).join(''); }
+
+function openAdd(prefill){
+  addMode = 'link'; draft = null; drawAdd();
+  if (typeof prefill === 'string' && prefill) { $('#link').value = prefill; previewLink(prefill); }
+}
+// One tap: read the link you just copied in the Target/Amazon app
+async function pasteLink(){
+  try { const t = await navigator.clipboard.readText(); $('#link').value = t; previewLink(t); }
+  catch(e){ $('#link').focus(); toast('Long-press the box and tap Paste'); }
+}
+function drawAdd(){
+  const body = addMode === 'link'
+    ? `<label>Paste a product link from any store</label>
+       <div class="row"><input id="link" placeholder="https://www.target.com/p/..." oninput="previewLink(this.value)">
+         <button class="btn primary" onclick="pasteLink()">📋 Paste</button></div><div id="pv"></div>`
+    : `<label>Search stores</label><input id="q" placeholder="Try: airpods, tide, air fryer" oninput="searchCat(this.value)"><div id="res"></div>`;
+  sheet(`<div class="seg">${['link','search'].map(m=>`<button class="${addMode===m?'on':''}" onclick="addMode='${m}';drawAdd()">${m==='link'?'🔗 Paste link':'🔍 Search stores'}</button>`).join('')}</div>
+    ${body}<label>Add to category</label><select id="dest">${catOptions()}</select>
+    <button class="btn full ghost" style="margin-top:10px" onclick="closeSheet()">Cancel</button>`);
+}
+function previewLink(v){
+  const p = parseLink(v);
+  if (!p) { $('#pv').innerHTML = v ? '<p class="sub" style="margin-top:8px">That doesn\'t look like a link yet…</p>' : ''; draft = null; return; }
+  draft = p;
+  const remembered = (state.storeCat||{})[p.store];            // last category you used for this store
+  if (remembered && cat(remembered) && !openCat) $('#dest').value = remembered;
+  $('#pv').innerHTML = `<div class="item" style="margin-top:12px"><div class="thumb">🛍️</div>
+      <div class="grow"><span class="chip">${esc(p.store)}</span><div class="sub" style="margin-top:4px">Store and name filled in from the link</div></div></div>
+    <label>Name</label><input id="dn" value="${esc(p.name)}" placeholder="Product name">
+    <label>Price</label><input id="dp" type="number" step="0.01" placeholder="0.00">
+    <div class="hint">📌 Prototype: price & photo can't be read from a link yet — the real app reads the store page (Stage 3). Type it in for now.</div>
+    <button class="btn full primary" style="margin-top:14px" onclick="addFromLink()">Add it</button>`;
+  setTimeout(()=>$('#dp') && $('#dp').focus(), 50);
+}
+function addFromLink(){ addItem({name:$('#dn').value.trim()||'Untitled item', store:draft.store, price:parseFloat($('#dp').value)||null, url:draft.url}); }
+function searchCat(q){
+  q = q.toLowerCase().trim();
+  const hits = q ? CATALOG.filter(c => c.name.toLowerCase().includes(q)) : [];
+  const low = Math.min(...hits.map(h=>h.price));
+  $('#res').innerHTML = hits.map((h,ix) => `<div class="result"><div class="thumb" style="width:46px;height:46px;font-size:22px">${h.emoji}</div>
+      <div class="grow"><div class="title" style="font-size:14px">${esc(h.name)}</div>
+      <div class="row" style="margin-top:3px"><span class="chip">${esc(h.store)}</span><b style="font-size:14px">$${h.price.toFixed(2)}</b>
+      ${h.price===low && hits.length>1?'<span class="chip drop">Best price</span>':''}</div></div>
+      <button class="btn primary" onclick="addItem(CATALOG[${CATALOG.indexOf(h)}])">Add</button></div>`).join('')
+    || (q ? '<p class="sub" style="margin-top:10px">No matches in the demo catalog.</p>' : '');
+}
+function addItem(p){
+  const c = cat($('#dest').value);
+  if (p.store) (state.storeCat ||= {})[p.store] = c.id;          // remember store → category
+  c.items.unshift({id:uid(), name:p.name, store:p.store, price:p.price, emoji:p.emoji, url:p.url, aisle:aisleFor(p.name), by:me, done:false, claimedBy:null});
+  closeSheet(); tab='home'; openCat=c.id; render(); toast(`Added to ${c.name}`);
+}
+
+function newCategorySheet(){
+  newCat = {emoji:'🛒', bg:3, gift:false};
+  drawNewCat();
+}
+function drawNewCat(){
+  sheet(`<h2>New category</h2>
+    <label>Name</label><input id="cn" placeholder="e.g. Pet Stuff, School, Costco run">
+    <label>Icon</label><div class="pick">${EMOJIS.map(e=>`<span class="${newCat.emoji===e?'on':''}" onclick="newCat.emoji='${e}';keepName(drawNewCat)">${e}</span>`).join('')}</div>
+    <label>Color</label><div class="pick">${TILE_BG.map((g,ix)=>`<span class="${newCat.bg===ix?'on':''}" style="background:${g}" onclick="newCat.bg=${ix};keepName(drawNewCat)"></span>`).join('')}</div>
+    <label>Count it in which budget category?</label>
+    <select id="cb"><option value="">— don't track —</option>${B().cats.map(b=>`<option ${b.name===newCat.bud?'selected':''}>${esc(b.name)}</option>`).join('')}</select>
+    <button class="btn full primary" style="margin-top:18px" onclick="createCat()">Create category</button>`);
+}
+function keepName(fn){ const v = $('#cn').value; if ($('#cb')) newCat.bud = $('#cb').value; fn(); $('#cn').value = v; }
+function createCat(){
+  const name = $('#cn').value.trim(); if (!name) return toast('Give it a name first');
+  const id = uid();
+  state.categories.push({id, name, emoji:newCat.emoji, bg:newCat.bg, gift:newCat.gift, items:[]});
+  if ($('#cb').value) B().map[id] = $('#cb').value;
+  closeSheet(); render(); toast(`${newCat.emoji} ${name} created`);
+}
+function budgetSheet(){
+  const opts = sel => `<option value="">— not linked —</option>` + B().cats.map(b=>`<option ${b.name===sel?'selected':''}>${esc(b.name)}</option>`).join('');
+  sheet(`<h2>💰 Budget sync</h2>
+    <p class="sub">Haulist shows how much budget is left while you shop, and finished trips get logged on your Paycheck Planner Spending tab.</p>
+    <label>Paste your Web App URL here:</label><input id="bu" value="${esc(B().url)}" placeholder="https://script.google.com/macros/s/.../exec">
+    <label>Paste your secret key here:</label><input id="bk" type="password" value="${esc(B().key)}" placeholder="same key as in HaulistSync.gs">
+    <div class="row" style="margin-top:10px"><button class="btn primary grow" onclick="saveBudget()">Save & test</button>
+      ${B().queue.length?`<button class="btn" onclick="flushQueue().then(n=>{toast(n+' trip(s) synced');budgetSheet()})">Retry ${B().queue.length}</button>`:''}</div>
+    <div class="cat">Link categories</div>
+    ${state.categories.map(c=>`<div class="row" style="margin-bottom:8px"><span style="width:44%;font-weight:600;font-size:14px">${c.emoji} ${esc(c.name)}</span>
+      <select onchange="B().map['${c.id}']=this.value;render()">${opts(B().map[c.id])}</select></div>`).join('')}
+    <p class="sub" style="margin-top:10px">Budget names come from Setup → "Your categories" in Paycheck Planner.</p>`);
+}
+function saveBudget(){ B().url = $('#bu').value.trim(); B().key = $('#bk').value.trim(); pullBudget(); budgetSheet(); }
+function editPrice(cid, iid){
+  const i = cat(cid).items.find(x=>x.id===iid);
+  sheet(`<h2>${esc(i.name)}</h2><label>Price</label><input id="ep" type="number" step="0.01" value="${i.price??''}" placeholder="0.00">
+    <button class="btn full primary" style="margin-top:14px" onclick="setPrice('${cid}','${iid}')">Save</button>
+    <button class="btn full ghost" style="margin-top:6px" onclick="removeItem('${cid}','${iid}')">Remove item</button>`);
+  setTimeout(()=>$('#ep').focus(),50);
+}
+function setPrice(cid,iid){ cat(cid).items.find(x=>x.id===iid).price = parseFloat($('#ep').value)||null; closeSheet(); render(); }
+function removeItem(cid,iid){ const c=cat(cid); c.items=c.items.filter(x=>x.id!==iid); closeSheet(); render(); toast('Removed'); }
+
+/* ===================== 5. ACTIONS ===================== */
+function toggle(cid, iid, inShop){
+  const i = cat(cid).items.find(x=>x.id===iid);
+  i.done = !i.done; buzz(); render();
+  if (inShop && i.done) { const el = $('#s_'+iid); el && el.classList.add('pop'); }
+  if (inShop) { const all = shoppable().filter(x => shopFilter==='all' || x.cid===shopFilter || 'store:'+x.store===shopFilter);
+    if (all.length && all.every(x=>x.done)) { confetti(); toast('🎉 Everything\'s in the cart!'); } }
+}
+function claim(cid, iid){
+  const i = cat(cid).items.find(x=>x.id===iid);
+  if (i.claimedBy && i.claimedBy !== me) return toast(`${who(i.claimedBy).name} already has this one`);
+  i.claimedBy = i.claimedBy ? null : me; render();
+  toast(i.claimedBy ? "Claimed — the family sees you've got it" : 'Unclaimed');
+}
+function quickAdd(cid, name){
+  name = (name||'').trim(); if (!name) return;
+  if (/^https?:\/\//i.test(name)) { openCat = cid; return openAdd(name); }   // pasted a link → link flow
+  const c = cat(cid);
+  if (c.items.some(x=>x.name.toLowerCase()===name.toLowerCase() && !x.done)) return toast(`${name} is already on the list`);
+  c.items.push({id:uid(), name, aisle:aisleFor(name), by:me, done:false, price:null, claimedBy:null});
+  render(); toast(`${name} → ${aisleFor(name)}`);
+}
+function finishTrip(){
+  const bought = shoppable().filter(i=>i.done);
+  if (!bought.length) return toast('Check some items off first');
+  const total = bought.reduce((s,i)=>s+(i.price||0),0);
+  // group the cart into budget lines: one per budget category
+  const lines = {};
+  bought.forEach(i => {
+    const b = B().map[i.cid] || '(not linked)';
+    const L = lines[b] ||= {category:b, label: i.cname + ' trip', amount:0, count:0};
+    L.amount += i.price || 0; L.count++;
+  });
+  pendingTrip = {id:uid()+Date.now().toString(36), date:new Date().toISOString().slice(0,10), shopper:who(me).name, lines:Object.values(lines)};
+  const noPrice = bought.filter(i=>!i.price).length;
+  sheet(`<div style="text-align:center;font-size:54px">🎉</div><h2 style="text-align:center">Trip complete!</h2>
+    <div class="code grad" style="font-size:34px;letter-spacing:0">$${total.toFixed(2)}</div>
+    <p class="sub" style="text-align:center">${bought.length} items bought by ${esc(who(me).name)}</p>
+    <div class="card" style="margin-top:14px">
+      <div class="row" style="justify-content:space-between"><div class="title">Log to Paycheck Planner</div>
+        <div class="switch ${logIt?'on':''}" onclick="logIt=!logIt;this.classList.toggle('on')"></div></div>
+      ${pendingTrip.lines.map(l=>`<div class="row" style="justify-content:space-between;padding:6px 0;font-size:14px">
+        <span>${esc(l.label)} → <b>${esc(l.category)}</b></span><b>$${l.amount.toFixed(2)}</b></div>`).join('')}
+      ${noPrice ? `<div class="hint">⚠️ ${noPrice} item(s) have no price — tap prices to fix before finishing.</div>`:''}
+    </div>
+    <button class="btn full primary" style="margin-top:6px" onclick="clearTrip()">Done</button>`);
+  confetti();
+}
+let pendingTrip = null, logIt = true;
+async function clearTrip(){
+  if (logIt && pendingTrip) {
+    // update the budget numbers right away (feels instant), then send to the sheet
+    pendingTrip.lines.forEach(l => { const bc = budCat(l.category); if (bc) bc.spent += l.amount; });
+    B().queue.push(pendingTrip);
+    const sent = B().url ? await flushQueue() : 0;
+    toast(sent ? `Logged ${pendingTrip.lines.length} line(s) to Paycheck Planner` : B().url ? 'Saved — will sync when online' : 'Demo: budget updated in the app');
+    if (!B().url) B().queue = [];   // demo mode has nowhere to send
+  }
+  pendingTrip = null; logIt = true;
+  state.categories.forEach(c => {
+    const got = c.items.filter(i=>i.done && !c.gift);
+    if (got.length) state.history[c.id] = [...new Set([...got.map(i=>i.name), ...(state.history[c.id]||[])])].slice(0,10);
+    if (!c.gift) c.items = c.items.filter(i=>!i.done);
+  });
+  closeSheet(); shopFilter='all'; go('home'); toast('Trip saved');
+}
+function sendInstacart(){
+  const items = shoppable().filter(i=>!i.done).map(i=>i.name);
+  sheet(`<h2>🥕 Send to Instacart</h2>
+    <p class="sub">The real app sends these ${items.length} items to Instacart and gets back a link. Open it, pick a store, check out.</p>
+    <div class="card" style="margin-top:12px">${items.map(n=>`<div style="padding:5px 0">• ${esc(n)}</div>`).join('')}</div>
+    <button class="btn full primary" onclick="closeSheet();toast('Prototype: Instacart would open here')">Open in Instacart</button>`);
+}
+function copyCode(){
+  const msg = `Join our family on Haulist! Code: ${state.inviteCode}`;
+  try { navigator.clipboard.writeText(msg).then(()=>toast('Invite copied — paste it in a text'), ()=>toast(msg)); } catch(e){ toast(msg); }
+}
+function joinFamily(code){
+  code = code.trim().toUpperCase(); if (!/^HAUL-[A-Z0-9]{4}$/.test(code)) return toast('Codes look like HAUL-XXXX');
+  const names = ['Grandma','Uncle Ray','Aunt Kim','Cousin Mia']; const n = names[state.members.length % names.length];
+  state.members.push({id:uid(), name:n, color:COLORS[state.members.length % COLORS.length], role:'Member', status:'Just joined 👋'});
+  render(); toast(`Prototype: pretend ${n} joined with ${code}`);
+}
+function confetti(){
+  const cols = ['#FF6B3D','#FFB23D','#2ECC8F','#22B8CF','#8B5CF6','#F43F5E'];
+  for (let k=0;k<60;k++){
+    const d = document.createElement('div'); d.className='confetti';
+    d.style.left = Math.random()*100+'vw'; d.style.background = cols[k%cols.length];
+    d.style.animationDuration = (1.6+Math.random()*1.6)+'s'; d.style.animationDelay = (Math.random()*.4)+'s';
+    d.style.borderRadius = Math.random()>.5 ? '50%' : '2px';
+    document.body.appendChild(d); setTimeout(()=>d.remove(), 3800);
+  }
+}
+
+/* ===================== 6. WIRING ===================== */
+try { const saved = JSON.parse(localStorage.getItem('haulist_v2')); if (saved && saved.budget) state = saved; } catch(e) {}
+function resetDemo(){ try { localStorage.removeItem('haulist_v2'); } catch(e) {} location.reload(); }
+document.querySelectorAll('nav button').forEach(b => b.onclick = () => b.dataset.tab === 'add' ? openAdd() : go(b.dataset.tab));
+$('#overlay').onclick = e => { if (e.target.id === 'overlay') closeSheet(); };
+render();
+</script>
+</body>
+</html>

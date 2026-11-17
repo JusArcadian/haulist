@@ -462,9 +462,10 @@ async function pasteLink(){
 function drawAdd(){
   const body = addMode === 'link'
     ? `<label>Paste a product link from any store</label>
-       <div class="row"><input id="link" placeholder="https://www.target.com/p/..." oninput="previewLink(this.value)">
+       <div class="row"><input id="link" placeholder="Paste a link" oninput="previewLink(this.value)">
          <button class="btn primary" onclick="pasteLink()">📋 Paste</button></div><div id="pv"></div>`
-    : `<label>Search stores</label><input id="q" placeholder="Try: airpods, tide, air fryer" oninput="searchCat(this.value)"><div id="res"></div>`;
+    : `<label>What are you looking for?</label><input id="q" placeholder="Search" oninput="searchCat(this.value)">
+       <p class="sub" style="margin-top:8px">Opens the store's search. Find your item, tap Share → Copy link, then come back and paste it.</p><div id="res"></div>`;
   sheet(`<div class="seg">${['link','search'].map(m=>`<button class="${addMode===m?'on':''}" onclick="addMode='${m}';drawAdd()">${m==='link'?'🔗 Paste link':'🔍 Search stores'}</button>`).join('')}</div>
     ${body}<label>Add to category</label><select id="dest">${catOptions()}</select>
     <button class="btn full ghost" style="margin-top:10px" onclick="closeSheet()">Cancel</button>`);
@@ -479,21 +480,17 @@ function previewLink(v){
       <div class="grow"><span class="chip">${esc(p.store)}</span><div class="sub" style="margin-top:4px">Store and name filled in from the link</div></div></div>
     <label>Name</label><input id="dn" value="${esc(p.name)}" placeholder="Product name">
     <label>Price</label><input id="dp" type="number" step="0.01" placeholder="0.00">
-    <div class="hint">📌 Prototype: price & photo can't be read from a link yet — the real app reads the store page (Stage 3). Type it in for now.</div>
+    <div class="sub" style="margin-top:6px">Type the price from the store page.</div>
     <button class="btn full primary" style="margin-top:14px" onclick="addFromLink()">Add it</button>`;
   setTimeout(()=>$('#dp') && $('#dp').focus(), 50);
 }
 function addFromLink(){ addItem({name:$('#dn').value.trim()||'Untitled item', store:draft.store, price:parseFloat($('#dp').value)||null, url:draft.url}); }
 function searchCat(q){
-  q = q.toLowerCase().trim();
-  const hits = q ? CATALOG.filter(c => c.name.toLowerCase().includes(q)) : [];
-  const low = Math.min(...hits.map(h=>h.price));
-  $('#res').innerHTML = hits.map((h,ix) => `<div class="result"><div class="thumb" style="width:46px;height:46px;font-size:22px">${h.emoji}</div>
-      <div class="grow"><div class="title" style="font-size:14px">${esc(h.name)}</div>
-      <div class="row" style="margin-top:3px"><span class="chip">${esc(h.store)}</span><b style="font-size:14px">$${h.price.toFixed(2)}</b>
-      ${h.price===low && hits.length>1?'<span class="chip drop">Best price</span>':''}</div></div>
-      <button class="btn primary" onclick="addItem(CATALOG[${CATALOG.indexOf(h)}])">Add</button></div>`).join('')
-    || (q ? '<p class="sub" style="margin-top:10px">No matches in the demo catalog.</p>' : '');
+  q = q.trim();
+  const STORE_SEARCH = {Target:'https://www.target.com/s?searchTerm=', Walmart:'https://www.walmart.com/search?q=',
+    Amazon:'https://www.amazon.com/s?k=', Publix:'https://www.publix.com/search?searchTerm=', Costco:'https://www.costco.com/CatalogSearch?keyword='};
+  $('#res').innerHTML = q ? `<div class="grid" style="margin-top:12px">${Object.entries(STORE_SEARCH).map(([n,u]) =>
+    `<a class="btn" style="text-align:center;text-decoration:none;padding:14px" href="${u+encodeURIComponent(q)}" target="_blank" rel="noopener">🔍 ${n}</a>`).join('')}</div>` : '';
 }
 function addItem(p){
   const c = cat($('#dest').value);
@@ -509,7 +506,7 @@ function newCategorySheet(){
 }
 function drawNewCat(){
   sheet(`<h2>New category</h2>
-    <label>Name</label><input id="cn" placeholder="e.g. Pet Stuff, School, Costco run">
+    <label>Name</label><input id="cn" placeholder="">
     <label>Icon</label><div class="pick">${EMOJIS.map(e=>`<span class="${newCat.emoji===e?'on':''}" onclick="newCat.emoji='${e}';keepName(drawNewCat)">${e}</span>`).join('')}</div>
     <label>Color</label><div class="pick">${TILE_BG.map((g,ix)=>`<span class="${newCat.bg===ix?'on':''}" style="background:${g}" onclick="newCat.bg=${ix};keepName(drawNewCat)"></span>`).join('')}</div>
     <label>Count it in which budget category?</label>
@@ -627,12 +624,17 @@ async function clearTrip(){
 function sendInstacart(){
   const items = shoppable().filter(i=>!i.done).map(i=>i.name);
   sheet(`<h2>🥕 Send to Instacart</h2>
-    <p class="sub">The real app sends these ${items.length} items to Instacart and gets back a link. Open it, pick a store, check out.</p>
+    <p class="sub">Copy your ${items.length} items, open Instacart, pick a store, and add them.</p>
     <div class="card" style="margin-top:12px">${items.map(n=>`<div style="padding:5px 0">• ${esc(n)}</div>`).join('')}</div>
-    <button class="btn full primary" onclick="closeSheet();toast('Prototype: Instacart would open here')">Open in Instacart</button>`);
+    <button class="btn full" onclick="copyList()">📋 Copy list</button>
+    <a class="btn full primary" style="display:block;text-align:center;text-decoration:none;margin-top:8px" href="https://www.instacart.com/store" target="_blank" rel="noopener">Open Instacart</a>`);
+}
+function copyList(){
+  const t = shoppable().filter(i=>!i.done).map(i=>'• '+i.name).join('\n');
+  try { navigator.clipboard.writeText(t).then(()=>toast('List copied'), ()=>toast('Copy blocked — long-press to select')); } catch(e){ toast('Copy blocked'); }
 }
 function copyCode(){
-  const msg = `Join our family on Haulist! Open ${location.href.split(/[?#]/)[0]} , make an account, tap Join and enter code ${state.inviteCode}`;
+  const msg = `Join our family on Haulist! Tap this link: ${location.href.split(/[?#]/)[0]}?join=${state.inviteCode}  (or enter code ${state.inviteCode})`;
   try { navigator.clipboard.writeText(msg).then(()=>toast('Invite copied — paste it in a text'), ()=>toast(msg)); } catch(e){ toast(msg); }
 }
 function joinFamily(code){
@@ -724,62 +726,129 @@ async function loadTable(t){
 async function boot(){
   const cfg = window.HAULIST_CONFIG || {};
   if (!window.supabase || !cfg.SUPABASE_URL || /PASTE/.test(cfg.SUPABASE_URL)) return handleShare();   // no keys → demo mode
+  const jc = new URLSearchParams(location.search).get('join');
+  if (jc) { pendingJoin = jc.toUpperCase(); try { localStorage.setItem('haulist_join', pendingJoin); } catch(e) {} history.replaceState(null, '', location.pathname); }
+  else { try { pendingJoin = localStorage.getItem('haulist_join') || ''; } catch(e) {} }
+  if (pendingJoin) authMode = 'up';
   sb = supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+  sb.auth.onAuthStateChange(ev => { if (ev === 'PASSWORD_RECOVERY') setTimeout(() => newPwScreen(), 300); });
   const {data:{session}} = await sb.auth.getSession();
   if (!session) return authScreen();
   me = session.user.id;
   const {data:mems, error} = await sb.from('members').select('family_id').eq('user_id', me);
   if (error) return toast('Sync error: ' + error.message);
-  if (!mems.length) return familySetup(session.user.user_metadata?.name || '');
-  await enterFamily(mems[0].family_id);
+  const myName = session.user.user_metadata?.name || '';
+  if (pendingJoin) return autoJoin(myName);                                 // came from an invite link
+  if (!mems.length) return familySetup(myName);
+  let last = ''; try { last = localStorage.getItem('haulist_family') || ''; } catch(e) {}
+  await enterFamily((mems.find(m => m.family_id === last) || mems[0]).family_id);
 }
 function lockSheet(html){ sheetLocked = true; sheet(html); }
 function unlockSheet(){ sheetLocked = false; closeSheet(); }
+let authMode = 'in';
 function authScreen(msg){
+  const up = authMode === 'up';
   lockSheet(`<div class="logo" style="text-align:center;font-size:34px;margin:6px 0 4px">Haul<span>ist</span></div>
-    <p class="sub" style="text-align:center">Your family's shared shopping list</p>
-    ${msg ? `<div class="hint" style="text-align:center">${esc(msg)}</div>` : ''}
-    <label>Your first name (new accounts)</label><input id="an" placeholder="e.g. Terrence" autocomplete="given-name">
-    <label>Email</label><input id="ae" type="email" autocomplete="email">
-    <label>Password (6+ characters)</label><input id="ap" type="password" autocomplete="current-password">
-    <button class="btn full primary" style="margin-top:16px" onclick="signIn()">Sign in</button>
-    <button class="btn full" style="margin-top:8px" onclick="signUp()">Create account</button>`);
+    <p class="sub" style="text-align:center;margin-bottom:10px">Your family's shared shopping list</p>
+    <div class="seg"><button class="${up?'':'on'}" onclick="authMode='in';authScreen()">Sign in</button>
+      <button class="${up?'on':''}" onclick="authMode='up';authScreen()">Create account</button></div>
+    ${pendingJoin && !msg ? `<div class="live" style="margin-top:8px">🎉 You've been invited to a family. Create an account (or sign in) to join.</div>` : ''}
+    ${msg ? `<div class="hint" style="text-align:center;margin:8px 0">${esc(msg)}</div>` : ''}
+    ${up ? `<label>First name</label><input id="an" autocomplete="given-name">` : ''}
+    <label>Email</label><input id="ae" type="email" autocomplete="email" value="${esc(lastEmail)}">
+    <label>Password${up ? ' (at least 6 characters)' : ''}</label>
+    <div class="row"><input id="ap" type="password" autocomplete="${up?'new-password':'current-password'}">
+      <button class="btn" onclick="const p=$('#ap');p.type=p.type==='password'?'text':'password';this.textContent=p.type==='password'?'Show':'Hide'">Show</button></div>
+    <button class="btn full primary" style="margin-top:16px" onclick="${up?'signUp()':'signIn()'}">${up?'Create account':'Sign in'}</button>
+    ${up ? '' : `<button class="btn full ghost" style="margin-top:6px" onclick="forgotPw()">Forgot password?</button>`}`);
 }
+let lastEmail = '';
+const remember = () => { lastEmail = ($('#ae')||{}).value || lastEmail; };
 async function signIn(){
-  const {error} = await sb.auth.signInWithPassword({email:$('#ae').value.trim(), password:$('#ap').value});
-  if (error) return authScreen(error.message);
+  remember();
+  const {error} = await sb.auth.signInWithPassword({email:lastEmail.trim(), password:$('#ap').value});
+  if (error) return authScreen(error.message === 'Invalid login credentials' ? 'Wrong email or password' : error.message);
   unlockSheet(); boot();
 }
 async function signUp(){
-  const name = $('#an').value.trim(); if (!name) return authScreen('Type your first name first');
-  const {data, error} = await sb.auth.signUp({email:$('#ae').value.trim(), password:$('#ap').value, options:{data:{name}}});
+  const name = $('#an').value.trim(); remember();
+  if (!name) return authScreen('Type your first name');
+  const {data, error} = await sb.auth.signUp({email:lastEmail.trim(), password:$('#ap').value, options:{data:{name}}});
   if (error) return authScreen(error.message);
-  if (!data.session) return authScreen('Check your email to confirm, then sign in.');
+  if (!data.session) { authMode = 'in'; return authScreen('Check your email to confirm, then sign in.'); }
   unlockSheet(); boot();
 }
-function familySetup(name){
-  lockSheet(`<h2>👨‍👩‍👧 Join your family</h2>
-    <label>Your first name</label><input id="fn" value="${esc(name)}">
-    <label>Got an invite code?</label>
-    <div class="row"><input id="fc" placeholder="HAUL-XXXX" style="text-transform:uppercase"><button class="btn primary" onclick="doJoin()">Join</button></div>
-    <div class="cat" style="text-align:center">or</div>
-    <label>Start a new family</label>
-    <div class="row"><input id="ff" placeholder="e.g. The Youngs"><button class="btn" onclick="doCreate()">Create</button></div>`);
+async function forgotPw(){
+  remember(); if (!lastEmail) return authScreen('Type your email first');
+  const {error} = await sb.auth.resetPasswordForEmail(lastEmail.trim(), {redirectTo: location.href.split(/[?#]/)[0]});
+  authScreen(error ? error.message : 'Check your email for a reset link');
+}
+function newPwScreen(msg){
+  lockSheet(`<h2>Set a new password</h2>${msg?`<div class="hint">${esc(msg)}</div>`:''}
+    <label>New password (at least 6 characters)</label><input id="np" type="password" autocomplete="new-password">
+    <button class="btn full primary" style="margin-top:14px" onclick="savePw()">Save password</button>`);
+}
+async function savePw(){
+  const {error} = await sb.auth.updateUser({password:$('#np').value});
+  if (error) return newPwScreen(error.message);
+  unlockSheet(); toast('Password updated'); boot();
+}
+function welcome(){
+  try { if (localStorage.getItem('haulist_welcomed')) return; localStorage.setItem('haulist_welcomed','1'); } catch(e) { return; }
+  sheet(`<h2>Welcome to Haulist 👋</h2>
+    <div class="item"><div class="thumb">➕</div><div class="grow"><div class="title">Add things</div><div class="sub">Type them in a category, or paste a link from any store app.</div></div></div>
+    <div class="item"><div class="thumb">🛒</div><div class="grow"><div class="title">Begin Shopping</div><div class="sub">Everything on one page. Tap to check off.</div></div></div>
+    <div class="item"><div class="thumb">👨‍👩‍👧</div><div class="grow"><div class="title">Invite family</div><div class="sub">Family tab → Copy invite. Lists update live for everyone.</div></div></div>
+    <button class="btn full primary" style="margin-top:10px" onclick="closeSheet()">Got it</button>`);
+}
+let pendingJoin = '', setupName = '';
+function familySetup(name, step, msg){
+  setupName = name ?? setupName;
+  const err = msg ? `<div class="hint" style="margin:8px 0">${esc(msg)}</div>` : '';
+  if (step === 'join') return lockSheet(`<div class="back" onclick="familySetup(null)">‹ Back</div><h2>Join a family</h2>
+    <p class="sub">Ask a family member for their code (Family tab → Copy invite).</p>${err}
+    <label>Invite code</label><input id="fc" placeholder="HAUL-XXXX" style="text-transform:uppercase;font-size:20px;letter-spacing:2px;text-align:center">
+    <button class="btn full primary" style="margin-top:14px" onclick="doJoin()">Join</button>`);
+  if (step === 'new') return lockSheet(`<div class="back" onclick="familySetup(null)">‹ Back</div><h2>Start a new list</h2>
+    <p class="sub">Name it whatever you like. You can invite people right after.</p>${err}
+    <label>List name</label><input id="ff" value="${esc(setupName ? setupName + "'s Family" : '')}">
+    <button class="btn full primary" style="margin-top:14px" onclick="doCreate()">Create</button>`);
+  lockSheet(`<h2>Hi${setupName ? ' ' + esc(setupName) : ''}! 👋</h2><p class="sub" style="margin-bottom:14px">How do you want to start?</p>${err}
+    <div class="card row tap" onclick="familySetup(null,'new')"><div class="thumb">✨</div>
+      <div class="grow"><div class="title">Start a new list</div><div class="sub">For you and your family. You'll get an invite code to share.</div></div></div>
+    <div class="card row tap" onclick="familySetup(null,'join')"><div class="thumb">🔑</div>
+      <div class="grow"><div class="title">Join a family</div><div class="sub">Someone already invited you? Enter their code.</div></div></div>
+    <button class="btn full ghost" onclick="signOut()">Sign out</button>`);
+}
+async function autoJoin(name){
+  const code = pendingJoin; pendingJoin = ''; try { localStorage.removeItem('haulist_join'); } catch(e) {}
+  const {data, error} = await sb.rpc('join_family', {code, my_name:name});
+  if (error) return familySetup(name, 'join', error.message + ' — check the code and try again.');
+  unlockSheet(); await enterFamily(data); toast("🎉 You're in! Lists sync live now.");
 }
 async function doJoin(){
-  const {data, error} = await sb.rpc('join_family', {code:$('#fc').value, my_name:$('#fn').value.trim()});
-  if (error) return toast(error.message);
-  unlockSheet(); enterFamily(data);
+  const {data, error} = await sb.rpc('join_family', {code:$('#fc').value, my_name:setupName});
+  if (error) return familySetup(null, 'join', error.message);
+  unlockSheet(); await enterFamily(data); toast("🎉 You're in! Lists sync live now.");
 }
 async function doCreate(){
-  const {data, error} = await sb.rpc('create_family', {fname:$('#ff').value.trim(), my_name:$('#fn').value.trim()});
-  if (error) return toast(error.message);
-  unlockSheet(); enterFamily(data);
+  const {data, error} = await sb.rpc('create_family', {fname:$('#ff').value.trim(), my_name:setupName});
+  if (error) return familySetup(null, 'new', error.message);
+  unlockSheet(); await enterFamily(data); inviteStep();
+}
+function inviteStep(){
+  try { localStorage.setItem('haulist_welcomed','1'); } catch(e) {}      // this replaces the welcome card
+  sheet(`<div style="text-align:center;font-size:48px">🎉</div><h2 style="text-align:center">Your list is ready!</h2>
+    <p class="sub" style="text-align:center">Invite your family so everyone sees the same list, live.</p>
+    <div class="code grad">${esc(state.inviteCode)}</div>
+    <button class="btn full primary" onclick="copyCode()">📋 Copy invite link</button>
+    <button class="btn full ghost" style="margin-top:6px" onclick="closeSheet()">I'll do it later</button>`);
 }
 async function enterFamily(fid){
   const {data:f, error} = await sb.from('families').select('*').eq('id', fid).single();
   if (error) return toast('Sync error: ' + error.message);
   fam = f; db = sb; state.familyName = f.name; state.inviteCode = f.invite_code;
+  try { localStorage.setItem('haulist_family', f.id); } catch(e) {}
   state.categories = []; state.members = []; state.history = {}; openCat = null;
   $('.banner').textContent = '🟢 Live · syncing with ' + f.name;
   await Promise.all(['categories','items','members','settings'].map(loadTable));
@@ -794,6 +863,7 @@ async function enterFamily(fid){
   ch.subscribe();
   document.addEventListener('visibilitychange', () => { if (!document.hidden) ['items','members'].forEach(refetch); });  // phone woke up
   if (B().url) pullBudget();
+  welcome();
   handleShare();
 }
 async function newCode(){

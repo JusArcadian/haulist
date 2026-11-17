@@ -4,7 +4,7 @@
 // =============================================================
 window.HAULIST_CONFIG = {
   // Paste your Project URL here:
-  SUPABASE_URL: 'https://abcdefghijk.supabase.co',
+  SUPABASE_URL: 'https://nhnnnmgtzrldvpfuyyif.supabase.co',
 
   // Paste your anon public key here (the "anon" / "public" one, NOT service_role):
   SUPABASE_ANON_KEY: 'sb_publishable_lF8yMbScmwQ81iwyVcm_VA_Za7hfbGx',
